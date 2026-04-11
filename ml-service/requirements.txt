@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pandas
+scikit-learn
+datasets
+joblib
+numpy
+huggingface_hub
+python-multipart

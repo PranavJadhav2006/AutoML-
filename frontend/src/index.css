@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global resets & base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: #0f0f1a;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #141428; }
+::-webkit-scrollbar-thumb { background: #4338ca; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+
+/* ── Glass morphism card ────────────────────────────────────────────────── */
+.glass {
+  background: rgba(26, 26, 53, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 16px;
+}
+
+.glass-dark {
+  background: rgba(15, 15, 26, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  border-radius: 12px;
+}
+
+/* ── Gradient text ──────────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 40%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-blue {
+  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Animated gradient background ──────────────────────────────────────── */
+.hero-gradient {
+  background: radial-gradient(ellipse at 20% 40%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 10%, rgba(167, 139, 250, 0.1) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 80%, rgba(52, 211, 153, 0.08) 0%, transparent 60%),
+              #0f0f1a;
+}
+
+/* ── Glow effects ───────────────────────────────────────────────────────── */
+.glow-brand {
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.25), 0 0 60px rgba(99, 102, 241, 0.1);
+}
+
+.glow-brand:hover {
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.4), 0 0 80px rgba(99, 102, 241, 0.15);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white
+         transition-all duration-300 cursor-pointer select-none;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(79, 70, 229, 0.55);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold
+         transition-all duration-300 cursor-pointer select-none;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #818cf8;
+}
+.btn-secondary:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white
+         transition-all duration-300 cursor-pointer select-none;
+  background: linear-gradient(135deg, #059669, #10b981);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+}
+.btn-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.55);
+}
+
+/* ── Input fields ───────────────────────────────────────────────────────── */
+.input-field {
+  @apply w-full px-4 py-3 rounded-xl text-white placeholder-slate-500 
+         transition-all duration-200 outline-none;
+  background: rgba(15, 15, 26, 0.8);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  font-family: "Inter", sans-serif;
+}
+.input-field:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* ── Step progress ──────────────────────────────────────────────────────── */
+.step-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #2a2a52;
+  border: 2px solid #4338ca;
+  transition: all 0.4s;
+}
+.step-dot.active {
+  background: #6366f1;
+  box-shadow: 0 0 12px rgba(99,102,241,0.7);
+  animation: pulse 1.5s infinite;
+}
+.step-dot.done {
+  background: #10b981;
+  border-color: #10b981;
+  box-shadow: 0 0 8px rgba(16,185,129,0.5);
+}
+
+/* ── Badge ──────────────────────────────────────────────────────────────── */
+.badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+}
+.badge-classification {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.badge-regression {
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+.badge-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ── Chat bubbles ───────────────────────────────────────────────────────── */
+.chat-bubble-user {
+  @apply self-end max-w-xl px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: white;
+}
+.chat-bubble-ai {
+  @apply self-start max-w-2xl px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed;
+  background: rgba(26, 26, 53, 0.9);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #e2e8f0;
+}
+
+/* ── Metric card ────────────────────────────────────────────────────────── */
+.metric-card {
+  @apply glass p-5 flex flex-col gap-1 transition-all duration-300;
+}
+.metric-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  transform: translateY(-2px);
+}
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+.data-table {
+  @apply w-full text-sm border-collapse;
+}
+.data-table th {
+  @apply text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider;
+  color: #818cf8;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+}
+.data-table td {
+  @apply py-2 px-3;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.data-table tr:hover td {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ── Typewriter cursor ──────────────────────────────────────────────────── */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.cursor { animation: blink 1s step-end infinite; }
+
+/* ── Floating particles (decorative blobs) ──────────────────────────────── */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.15;
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(99, 102, 241, 0.3);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Fade up animation ──────────────────────────────────────────────────── */
+.fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Progress bar ───────────────────────────────────────────────────────── */
+.progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(99, 102, 241, 0.15);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4f46e5, #34d399);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+}
