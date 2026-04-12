@@ -207,6 +207,47 @@ export default function Training() {
             </dl>
           </div>
 
+          {/* Data Insights */}
+          {result.plots && Object.keys(result.plots).length > 0 && (
+            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.18s" }}>
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                📊 Data Insights
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {result.plots.heatmap && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Correlation Heatmap</h3>
+                    <img src={result.plots.heatmap} alt="Correlation Heatmap" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.feature_importance && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Importance</h3>
+                    <img src={result.plots.feature_importance} alt="Feature Importance" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.distribution && (
+                  <div className="flex flex-col items-center md:col-span-2 bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Distributions</h3>
+                    <img src={result.plots.distribution} alt="Feature Distributions" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.01]" />
+                  </div>
+                )}
+                {result.plots.target && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Target Distribution</h3>
+                    <img src={result.plots.target} alt="Target Distribution" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.missing && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Missing Values</h3>
+                    <img src={result.plots.missing} alt="Missing Values" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* CTA buttons */}
           <div className="flex flex-wrap gap-4 fade-up" style={{ animationDelay: "0.2s" }}>
             <Link

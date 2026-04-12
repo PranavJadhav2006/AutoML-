@@ -262,6 +262,7 @@ def _preprocess(
 # ---------------------------------------------------------------------------
 
 from services.dataset_service import DatasetService
+from services.visualization_service import VisualizationService
 
 def auto_train(problem_description: str) -> Dict[str, Any]:
     logger.info(f"Training request: '{problem_description}'")
@@ -399,6 +400,12 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
     joblib.dump(artifact, os.path.join(MODELS_DIR, f"{model_id}.joblib"))
     logger.info(f"Model saved: {model_id}")
 
+    try:
+        plots = VisualizationService.generate_all(df, best_model, feature_cols, target_col, task)
+    except Exception as e:
+        logger.error(f"Visualization failed: {e}")
+        plots = {}
+
     return {
         "model_id": model_id,
         "dataset_name": dataset_name,
@@ -414,4 +421,5 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
         "feature_names": feature_cols,
         "dataset_rows": len(df),
         "dataset_cols": len(feature_cols) + 1,
+        "plots": plots,
     }

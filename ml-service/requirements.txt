@@ -10,3 +10,5 @@ python-multipart
 openml
 kaggle
 python-dotenv
+matplotlib
+seaborn
