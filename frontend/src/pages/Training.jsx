@@ -156,6 +156,37 @@ export default function Training() {
             </div>
           </div>
 
+          {/* Dataset Preview */}
+          {result.dataset_preview && result.dataset_preview.length > 0 && (
+            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.12s" }}>
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                👀 Dataset Preview (First 5 Rows)
+              </h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-700/50">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-800/80 text-xs uppercase font-semibold text-slate-400 border-b border-slate-700/50">
+                    <tr>
+                      {Object.keys(result.dataset_preview[0]).map((col) => (
+                        <th key={col} className="px-4 py-3 whitespace-nowrap">{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 bg-slate-900/20">
+                    {result.dataset_preview.map((row, i) => (
+                      <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                        {Object.values(row).map((val, colIdx) => (
+                          <td key={colIdx} className="px-4 py-3 whitespace-nowrap truncate max-w-[200px]">
+                            {val !== null && val !== undefined ? String(val) : ""}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Model info */}
           <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.15s" }}>
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">

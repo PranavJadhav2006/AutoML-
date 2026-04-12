@@ -7,3 +7,6 @@ joblib
 numpy
 huggingface_hub
 python-multipart
+openml
+kaggle
+python-dotenv

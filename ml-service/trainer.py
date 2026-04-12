@@ -32,7 +32,7 @@ from sklearn.ensemble import (
     RandomForestRegressor, GradientBoostingRegressor
 )
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import accuracy_score, f1_score, r2_score, mean_squared_error
 
@@ -261,22 +261,43 @@ def _preprocess(
 # Main training function
 # ---------------------------------------------------------------------------
 
+from services.dataset_service import DatasetService
+
 def auto_train(problem_description: str) -> Dict[str, Any]:
     logger.info(f"Training request: '{problem_description}'")
 
-    # Step 1: Match dataset
-    entry = _match_dataset(problem_description)
-    task = entry["task"]
-    logger.info(f"Matched dataset: {entry['name']} | task: {task}")
-
-    # Step 2: Load
+    # Step 1 & 2: Match and Load dataset dynamically
+    dataset_service = DatasetService()
     try:
-        df, target_col, feature_cols = _load_dataset(entry)
+        ds_info = dataset_service.get_best_dataset(problem_description)
+        df = ds_info["df"]
+        target_col = ds_info["target_col"]
+        task = ds_info["task"]
+        feature_cols = ds_info["features"]
+        dataset_name = ds_info["dataset"]
+        dataset_source = ds_info["source"]
+        dataset_score = ds_info["score"]
+        logger.info(f"Matched dataset dynamically: {dataset_name} | task: {task} | source: {dataset_source}")
     except Exception as e:
-        logger.error(f"Dataset load failed: {e}, falling back to Iris")
-        df, target_col, feature_cols = _load_sklearn_iris()
-        task = "classification"
-        entry = {"name": "Iris Flower Species (fallback)"}
+        logger.error(f"Dynamic dataset load failed: {e}, falling back to static registry")
+        # Step 1: Match dataset
+        entry = _match_dataset(problem_description)
+        task = entry["task"]
+        logger.info(f"Matched dataset: {entry['name']} | task: {task}")
+
+        # Step 2: Load
+        try:
+            df, target_col, feature_cols = _load_dataset(entry)
+        except Exception as fallback_e:
+            logger.error(f"Dataset load failed: {fallback_e}, falling back to Iris")
+            df, target_col, feature_cols = _load_sklearn_iris()
+            task = "classification"
+            entry = {"name": "Iris Flower Species (fallback)", "source": "sklearn"}
+            
+        dataset_name = entry["name"]
+        dataset_source = entry.get("source", "sklearn")
+        dataset_score = 0
+
 
     logger.info(f"Dataset loaded: {len(df)} rows, {len(feature_cols)} features")
 
@@ -293,26 +314,55 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
     X_train_s = scaler.fit_transform(X_train)
     X_test_s = scaler.transform(X_test)
 
-    # Step 4: Train candidate models
+    # Step 4: Train candidate models with hyperparameter tuning
     if task == "classification":
         candidates = [
-            ("Random Forest", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
-            ("Gradient Boosting", GradientBoostingClassifier(n_estimators=100, random_state=42)),
-            ("Logistic Regression", LogisticRegression(max_iter=1000, random_state=42)),
+            (
+                "Random Forest", 
+                RandomForestClassifier(random_state=42, n_jobs=-1),
+                {"n_estimators": [50, 100, 200], "max_depth": [None, 10, 20]}
+            ),
+            (
+                "Gradient Boosting", 
+                GradientBoostingClassifier(random_state=42),
+                {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.1, 0.2]}
+            ),
+            (
+                "Logistic Regression", 
+                LogisticRegression(random_state=42, max_iter=2000),
+                {"C": [0.1, 1.0, 10.0]}
+            ),
         ]
     else:
         candidates = [
-            ("Random Forest", RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)),
-            ("Gradient Boosting", GradientBoostingRegressor(n_estimators=100, random_state=42)),
-            ("Ridge Regression", Ridge()),
+            (
+                "Random Forest", 
+                RandomForestRegressor(random_state=42, n_jobs=-1),
+                {"n_estimators": [50, 100, 200], "max_depth": [None, 10, 20]}
+            ),
+            (
+                "Gradient Boosting", 
+                GradientBoostingRegressor(random_state=42),
+                {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.1, 0.2]}
+            ),
+            (
+                "Ridge Regression", 
+                Ridge(),
+                {"alpha": [0.1, 1.0, 10.0]}
+            ),
         ]
 
     best_model, best_score, best_name, best_metrics = None, -999.0, "", {}
 
-    for name, model in candidates:
+    for name, model, params in candidates:
         try:
-            model.fit(X_train_s, y_train)
-            y_pred = model.predict(X_test_s)
+            # Hyperparameter tuning
+            logger.info(f"  Tuning {name}...")
+            grid_search = GridSearchCV(model, params, cv=3, n_jobs=-1, scoring='accuracy' if task == 'classification' else 'r2')
+            grid_search.fit(X_train_s, y_train)
+            
+            best_tuned_model = grid_search.best_estimator_
+            y_pred = best_tuned_model.predict(X_test_s)
 
             if task == "classification":
                 score = float(accuracy_score(y_test, y_pred))
@@ -327,9 +377,9 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
                     "rmse": round(float(np.sqrt(mean_squared_error(y_test, y_pred))), 4),
                 }
 
-            logger.info(f"  {name}: score={score:.4f}")
+            logger.info(f"  {name}: score={score:.4f} (params: {grid_search.best_params_})")
             if score > best_score:
-                best_score, best_model, best_name, best_metrics = score, model, name, metrics
+                best_score, best_model, best_name, best_metrics = score, best_tuned_model, name, metrics
         except Exception as e:
             logger.warning(f"  {name} failed: {e}")
 
@@ -343,7 +393,7 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
         "scaler": scaler,
         "feature_names": feature_cols,
         "task": task,
-        "dataset_name": entry["name"],
+        "dataset_name": dataset_name,
         "df_sample": df.head(500).to_dict(orient="list"),
     }
     joblib.dump(artifact, os.path.join(MODELS_DIR, f"{model_id}.joblib"))
@@ -351,7 +401,13 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
 
     return {
         "model_id": model_id,
-        "dataset_name": entry["name"],
+        "dataset_name": dataset_name,
+        "dataset": dataset_name,
+        "source": dataset_source,
+        "score": dataset_score,
+        "task": task,
+        "features": feature_cols,
+        "dataset_preview": df.head(5).fillna("").to_dict(orient="records"),
         "task_type": task,
         "best_model": best_name,
         "metrics": best_metrics,
