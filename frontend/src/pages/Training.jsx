@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, MessageCircle, Database, CheckCircle2, Server, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 
+<<<<<<< HEAD
 // --- Constants & Config --- //
 const API_URL = "http://localhost:8000";
 
@@ -15,6 +16,16 @@ const DOMAINS = [
   { label: "Monitor Energy", fill: "Predict energy consumption anomalies from IoT sensor data", domain: "IoT", emoji: "⚡" },
   { label: "Price Property", fill: "Estimate real estate prices from location and property features", domain: "Real Estate", emoji: "🏠" },
   { label: "Segment Customers", fill: "Group customers by purchase behaviour for targeted campaigns", domain: "Marketing", emoji: "🎯" }
+=======
+const TRAINING_STEPS = [
+  { id: "match",    label: "Matching dataset",          icon: "🔍" },
+  { id: "load",     label: "Loading & preprocessing",   icon: "📦" },
+  { id: "sample",   label: "Sampling 30% for speed",    icon: "⚡" },
+  { id: "train",    label: "Parallel model training",   icon: "🤖" },
+  { id: "compare",  label: "Comparing & selecting best",icon: "🏆" },
+  { id: "retrain",  label: "Retraining best on full data",icon:"🎯" },
+  { id: "save",     label: "Saving model artifact",     icon: "💾" },
+>>>>>>> origin/main
 ];
 
 const SUGGESTIONS = [
@@ -413,6 +424,7 @@ export default function Training() {
               </div>
             </div>
 
+<<<<<<< HEAD
             {/* STEP 02: Goal & Description */}
             <div className="py-8 border-b border-slate-100 relative">
               <div className="mb-6 text-center">
@@ -667,6 +679,258 @@ export default function Training() {
           </form>
         </motion.div>
       </div>
+=======
+          {/* ── Smart Preprocessing Report ── */}
+          {result.preprocessing && (
+            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.16s" }}>
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5">
+                🧠 Smart Preprocessing Report
+              </h2>
+
+              {/* Dataset Analysis row */}
+              {result.preprocessing.dataset_analysis && (
+                <div
+                  className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 p-3 rounded-xl"
+                  style={{ background: "rgba(15,23,42,0.5)", border: "1px solid rgba(51,65,85,0.4)" }}
+                >
+                  {[
+                    ["Rows", result.preprocessing.dataset_analysis.size?.toLocaleString(), "📦"],
+                    ["Numeric Cols", result.preprocessing.dataset_analysis.num_cols, "🔢"],
+                    ["Categoric Cols", result.preprocessing.dataset_analysis.cat_cols, "🏷️"],
+                    ["Pre-scaled?", result.preprocessing.dataset_analysis.is_scaled ? "Yes" : "No", "📐"],
+                  ].map(([label, val, icon]) => (
+                    <div key={label} className="text-center">
+                      <div className="text-lg mb-1">{icon}</div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">{label}</div>
+                      <div className="text-sm font-bold text-slate-200 mt-0.5">{val ?? "—"}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Decision chips */}
+              <div className="flex flex-wrap gap-2">
+                {/* Target column */}
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.35)", color: "#a5b4fc" }}>
+                  🎯 Target: <span className="font-mono">{result.preprocessing.target_column}</span>
+                </span>
+
+                {/* Missing values */}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                  result.preprocessing.missing_handled
+                    ? "text-amber-300"
+                    : "text-slate-500"
+                }`}
+                  style={{
+                    background: result.preprocessing.missing_handled ? "rgba(245,158,11,0.12)" : "rgba(51,65,85,0.3)",
+                    border: result.preprocessing.missing_handled ? "1px solid rgba(245,158,11,0.3)" : "1px solid rgba(51,65,85,0.4)",
+                  }}>
+                  {result.preprocessing.missing_handled
+                    ? `✅ Missing filled (${result.preprocessing.values_filled ?? 0} values)`
+                    : "⬜ No missing values"}
+                </span>
+
+                {/* Encoding */}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                  result.preprocessing.categorical_encoded > 0 ? "text-violet-300" : "text-slate-500"
+                }`}
+                  style={{
+                    background: result.preprocessing.categorical_encoded > 0 ? "rgba(139,92,246,0.12)" : "rgba(51,65,85,0.3)",
+                    border: result.preprocessing.categorical_encoded > 0 ? "1px solid rgba(139,92,246,0.3)" : "1px solid rgba(51,65,85,0.4)",
+                  }}>
+                  {result.preprocessing.categorical_encoded > 0
+                    ? `✅ Encoded ${result.preprocessing.categorical_encoded} cat. col(s)`
+                    : "⬜ No encoding needed"}
+                </span>
+
+                {/* Scaling */}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                  result.preprocessing.scaling_applied ? "text-emerald-300" : "text-slate-500"
+                }`}
+                  style={{
+                    background: result.preprocessing.scaling_applied ? "rgba(16,185,129,0.12)" : "rgba(51,65,85,0.3)",
+                    border: result.preprocessing.scaling_applied ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(51,65,85,0.4)",
+                  }}>
+                  {result.preprocessing.scaling_applied
+                    ? "✅ StandardScaler applied"
+                    : "⬜ Scaling skipped (already normalised)"}
+                </span>
+
+                {/* Outliers */}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                  result.preprocessing.outliers_removed > 0 ? "text-rose-300" : "text-slate-500"
+                }`}
+                  style={{
+                    background: result.preprocessing.outliers_removed > 0 ? "rgba(244,63,94,0.12)" : "rgba(51,65,85,0.3)",
+                    border: result.preprocessing.outliers_removed > 0 ? "1px solid rgba(244,63,94,0.3)" : "1px solid rgba(51,65,85,0.4)",
+                  }}>
+                  {result.preprocessing.outliers_removed > 0
+                    ? `✅ ${result.preprocessing.outliers_removed} outlier rows removed (IQR)`
+                    : "⬜ Outlier removal skipped (< 1000 rows)"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Model Comparison ── */}
+          {result.model_comparison && Object.keys(result.model_comparison).length > 0 && (
+            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.17s" }}>
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5">
+                🏆 Model Comparison
+              </h2>
+
+              {/* Best-model callout */}
+              <div
+                className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl"
+                style={{
+                  background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(16,185,129,0.12))",
+                  border: "1px solid rgba(99,102,241,0.35)",
+                }}
+              >
+                <span className="text-2xl">🥇</span>
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Best Model</p>
+                  <p className="text-lg font-bold text-brand-300">{result.best_model}</p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                    {result.task_type === "classification" ? "Accuracy" : "R² Score"}
+                  </p>
+                  <p className="text-2xl font-black text-accent-400">
+                    {result.model_comparison[result.best_model]?.toFixed(4)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Leaderboard rows */}
+              <div className="flex flex-col gap-3">
+                {Object.entries(result.model_comparison)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([name, score], idx) => {
+                    const isWinner = name === result.best_model;
+                    const maxScore = Math.max(...Object.values(result.model_comparison));
+                    const barWidth = maxScore > 0 ? (score / maxScore) * 100 : 0;
+                    const medals = ["🥇", "🥈", "🥉"];
+                    return (
+                      <div
+                        key={name}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200"
+                        style={{
+                          background: isWinner
+                            ? "rgba(99,102,241,0.12)"
+                            : "rgba(15,23,42,0.5)",
+                          border: isWinner
+                            ? "1px solid rgba(99,102,241,0.3)"
+                            : "1px solid rgba(51,65,85,0.4)",
+                        }}
+                      >
+                        {/* Rank medal */}
+                        <span className="text-lg w-6 text-center flex-shrink-0">
+                          {medals[idx] ?? `#${idx + 1}`}
+                        </span>
+
+                        {/* Name */}
+                        <span
+                          className={`text-sm font-semibold w-36 flex-shrink-0 ${
+                            isWinner ? "text-brand-300" : "text-slate-300"
+                          }`}
+                        >
+                          {name}
+                        </span>
+
+                        {/* Bar */}
+                        <div className="flex-1 h-2 rounded-full bg-slate-700/60 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${barWidth}%`,
+                              background: isWinner
+                                ? "linear-gradient(90deg, #6366f1, #10b981)"
+                                : "linear-gradient(90deg, #475569, #94a3b8)",
+                            }}
+                          />
+                        </div>
+
+                        {/* Score */}
+                        <span
+                          className={`text-sm font-mono font-bold w-14 text-right flex-shrink-0 ${
+                            isWinner ? "text-accent-400" : "text-slate-400"
+                          }`}
+                        >
+                          {score.toFixed(4)}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Data Insights */}
+          {result.plots && Object.keys(result.plots).length > 0 && (
+            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.18s" }}>
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                📊 Data Insights
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {result.plots.heatmap && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Correlation Heatmap</h3>
+                    <img src={result.plots.heatmap} alt="Correlation Heatmap" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.feature_importance && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Importance</h3>
+                    <img src={result.plots.feature_importance} alt="Feature Importance" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.distribution && (
+                  <div className="flex flex-col items-center md:col-span-2 bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Distributions</h3>
+                    <img src={result.plots.distribution} alt="Feature Distributions" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.01]" />
+                  </div>
+                )}
+                {result.plots.target && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Target Distribution</h3>
+                    <img src={result.plots.target} alt="Target Distribution" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+                {result.plots.missing && (
+                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
+                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Missing Values</h3>
+                    <img src={result.plots.missing} alt="Missing Values" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CTA buttons */}
+          <div className="flex flex-wrap gap-4 fade-up" style={{ animationDelay: "0.2s" }}>
+            <Link
+              to="/playground"
+              id="go-to-playground-btn"
+              className="btn-primary text-base py-3.5 px-8"
+            >
+              🎮 Open Playground
+            </Link>
+            <Link
+              to="/chat"
+              id="go-to-chat-btn"
+              className="btn-secondary text-base py-3.5 px-8"
+            >
+              💬 Chat with Dataset
+            </Link>
+            <Link to="/" className="btn-secondary text-base py-3.5 px-8">
+              🔁 Train New Model
+            </Link>
+          </div>
+        </>
+      )}
+>>>>>>> origin/main
     </main>
   );
 }

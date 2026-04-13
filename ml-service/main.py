@@ -20,7 +20,7 @@ if not _kaggle_token:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from trainer import auto_train
+from trainer import auto_train, retrain_from_artifact
 from predictor import predict
 from chat_engine import chat_with_dataset
 from services.dataset_service import DatasetService
@@ -51,6 +51,10 @@ class PredictRequest(BaseModel):
 class ChatRequest(BaseModel):
     model_id: str
     question: str
+
+
+class RetrainRequest(BaseModel):
+    model_id: str
 
 
 @app.get("/health")
@@ -107,3 +111,13 @@ async def search_datasets_endpoint(req: TrainRequest):
     sorted_ds = sorted(all_ds, key=lambda x: x.get("_score", 0), reverse=True)
     
     return {"datasets": sorted_ds}
+
+
+@app.post("/retrain")
+async def retrain_endpoint(req: RetrainRequest):
+    """
+    Retrains the model utilizing the dataset tied to the model ID, which
+    may have been modified via the chat interaction pipeline.
+    """
+    result = retrain_from_artifact(req.model_id)
+    return result

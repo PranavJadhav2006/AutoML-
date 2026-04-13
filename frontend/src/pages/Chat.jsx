@@ -2,7 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
+<<<<<<< HEAD
 const ML_URL = "http://localhost:8000";
+=======
+const SUGGESTED_QUESTIONS = [
+  "Remove missing values",
+  "Label encode categorical data",
+  "Remove outliers",
+  "Undo last action",
+  "What are the feature names?",
+  "What is the class distribution?",
+  "Describe the dataset statistics",
+];
+>>>>>>> origin/main
 
 function DataTable({ data }) {
   if (!data || typeof data !== "object") return null;
@@ -60,15 +72,23 @@ function DataTable({ data }) {
 
 function ChatMessage({ msg }) {
   const isUser = msg.role === "user";
+  const isAction = msg.type === "action";
+  const isError = msg.type === "error";
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} fade-up`}>
       {!isUser && (
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm mr-2 flex-shrink-0 mt-1"
-             style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
-          🤖
+             style={{ background: isError ? "rgba(244,63,94,0.3)" : isAction ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
+          {isAction ? "⚡" : isError ? "⚠️" : "🤖"}
         </div>
       )}
+<<<<<<< HEAD
       <div className={isUser ? "chat-bubble-user" : "chat-bubble-ai max-w-2xl"}>
+=======
+      <div className={isUser ? "chat-bubble-user" : "chat-bubble-ai max-w-2xl overflow-x-hidden"}>
+        {/* Markdown-ish: bold */}
+>>>>>>> origin/main
         <p className="whitespace-pre-wrap leading-relaxed"
            dangerouslySetInnerHTML={{
              __html: msg.content
@@ -76,7 +96,51 @@ function ChatMessage({ msg }) {
                .replace(/`(.*?)`/g, '<code class="font-mono text-brand-300 bg-brand-900/40 px-1 rounded">$1</code>'),
            }}
         />
+        
+        {msg.changes && (
+          <div className="mt-3 p-3 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">Applied Changes</p>
+            <div className="flex gap-6">
+              <div>
+                <span className="text-xl font-bold text-slate-200">{msg.changes.rows_affected ?? 0}</span>
+                <span className="text-xs text-slate-400 ml-1.5">Rows affected</span>
+              </div>
+              <div>
+                <span className="text-xl font-bold text-slate-200">{msg.changes.columns_modified ?? 0}</span>
+                <span className="text-xs text-slate-400 ml-1.5">Cols modified</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {msg.data && <DataTable data={msg.data} />}
+
+        {msg.preview && msg.preview.length > 0 && (
+          <div className="mt-3 overflow-x-auto rounded-lg" style={{ background: "rgba(15,15,26,0.6)", border: "1px solid rgba(51,65,85,0.4)" }}>
+            <div className="p-2 bg-slate-900/50 border-b border-slate-700/50 flex items-center justify-between">
+               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Dataset Preview</p>
+            </div>
+            <table className="data-table text-xs">
+              <thead>
+                <tr>
+                  {Object.keys(msg.preview[0] || {}).map((k) => <th key={k}>{k}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {msg.preview.map((row, idx) => (
+                  <tr key={idx}>
+                    {Object.values(row).map((val, colIdx) => (
+                      <td key={colIdx} className="font-mono truncate max-w-[150px]">
+                        {val !== null && val !== undefined ? String(val) : ""}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </div>
       {isUser && (
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm ml-2 flex-shrink-0 mt-1"
@@ -90,12 +154,20 @@ function ChatMessage({ msg }) {
 
 export default function Chat() {
   const navigate = useNavigate();
+<<<<<<< HEAD
   const [sessionData, setSessionData] = useState(null);   // holds trainResult
   const [handoff, setHandoff]         = useState(null);   // holds chatHandoff
   const [messages, setMessages]       = useState([]);
   const [suggestedQueries, setSuggestedQueries] = useState([]);
   const [input, setInput]             = useState("");
   const [loading, setLoading]         = useState(false);
+=======
+  const [result, setResult] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [retraining, setRetraining] = useState(false);
+>>>>>>> origin/main
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -151,6 +223,7 @@ export default function Chat() {
     setLoading(true);
 
     try {
+<<<<<<< HEAD
       // New pipeline: use /api/chat-dataset with dataset_path
       if (handoff?.dataset_path) {
         const res = await axios.post(`${ML_URL}/api/dataset/chat`, {
@@ -175,6 +248,23 @@ export default function Chat() {
       } else {
         throw new Error("No active session found.");
       }
+=======
+      const res = await axios.post("/api/chat", {
+        model_id: result.model_id,
+        question: q,
+      });
+      setMessages((prev) => [
+        ...prev,
+        { 
+          role: "ai", 
+          content: res.data.answer || "Action completed.", 
+          data: res.data.data,
+          type: res.data.type,
+          changes: res.data.changes,
+          preview: res.data.preview
+        },
+      ]);
+>>>>>>> origin/main
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -192,6 +282,7 @@ export default function Chat() {
     }
   };
 
+<<<<<<< HEAD
   // Display name
   const datasetName = handoff?.profile_summary
     ? (sessionData?.dataset_name || "Your Dataset")
@@ -200,6 +291,29 @@ export default function Chat() {
   const profileSummary = handoff?.profile_summary;
 
   if (!sessionData && !handoff) return null;
+=======
+  const handleRetrain = async () => {
+    if (retraining) return;
+    setRetraining(true);
+    try {
+      const res = await axios.post("/api/retrain", {
+        model_id: result.model_id,
+      });
+      // Update session storage with the newly generated training artifact payload
+      sessionStorage.setItem("trainResult", JSON.stringify(res.data));
+      // Bounce immediately back to the Training UI where it will parse the new results
+      navigate("/training");
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: "⚠️ Failed to retrain model. Ensure data integrity holds cleanly.", type: "error" },
+      ]);
+      setRetraining(false);
+    }
+  };
+
+  if (!result) return null;
+>>>>>>> origin/main
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-12 flex flex-col h-[calc(100vh-64px)]">
@@ -224,9 +338,32 @@ export default function Chat() {
               )}
             </p>
           </div>
+<<<<<<< HEAD
           <Link to="/training" className="btn-secondary text-sm py-2">
             ← New Dataset
           </Link>
+=======
+          <div className="flex gap-3">
+            <button 
+              onClick={handleRetrain} 
+              disabled={retraining || loading}
+              className="btn-primary text-sm py-2 flex items-center gap-2"
+              style={{ background: retraining ? "rgba(99,102,241,0.5)" : "" }}
+            >
+              {retraining ? (
+                <>
+                  <span className="spinner w-3 h-3" style={{ borderTopColor: "#fff" }} />
+                  Retraining...
+                </>
+              ) : (
+                "🔄 Retrain Model"
+              )}
+            </button>
+            <Link to="/playground" className="btn-secondary text-sm py-2">
+              🎮 Playground
+            </Link>
+          </div>
+>>>>>>> origin/main
         </div>
       </div>
 
