@@ -10,7 +10,7 @@ const ML_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
  * Proxies to FastAPI POST /auto-train
  */
 router.post("/", async (req, res) => {
-  const { problem_description } = req.body;
+  const { problem_description, mode } = req.body;
 
   if (!problem_description || typeof problem_description !== "string") {
     return res.status(400).json({ error: "problem_description is required." });
@@ -19,7 +19,7 @@ router.post("/", async (req, res) => {
   try {
     const response = await axios.post(
       `${ML_URL}/auto-train`,
-      { problem_description },
+      { problem_description, mode: mode || "auto" },
       { timeout: 300_000 } // 5-minute timeout for training
     );
     res.json(response.data);

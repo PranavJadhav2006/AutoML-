@@ -2,6 +2,29 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
 import { Zap, Bot, Rocket, Search } from "lucide-react";
+import axios from "axios";
+
+const ML_PROMPTS = [
+  "Predict house prices based on features like size, location, and rooms",
+  "Classify iris flowers into species using petal and sepal measurements",
+  "Diagnose breast cancer as malignant or benign from cell measurements",
+  "Predict titanic passenger survival based on age, class, and gender",
+];
+
+const DL_PROMPTS = [
+  "Deep neural network for complex non-linear sensor data patterns",
+  "Use Deep Learning to detect anomalies in large-scale financial transactions",
+  "Multi-layer perceptron for high-dimensional genomic classification",
+  "Neural network model for predicting customer lifetime value (LTV)",
+];
+
+const AUTO_PROMPTS = [...ML_PROMPTS.slice(0, 2), ...DL_PROMPTS.slice(0, 2)];
+
+const MODE_CONFIG = {
+  auto: { label: "Auto", icon: "✨", desc: "System picks the best approach for your dataset" },
+  ml:   { label: "ML",   icon: "🤖", desc: "Parallel ML models — fastest, great for tabular data" },
+  dl:   { label: "DL",   icon: "🧠", desc: "Neural network — best for large / complex datasets" },
+};
 
 const FEATURES = [
   { icon: Zap, color: "text-amber-500", title: "Automated Model Training", desc: "From upload to trained model in under 30 minutes. We select algorithms and tune hyperparameters automatically." },
@@ -30,6 +53,56 @@ export default function Home() {
   const navigate = useNavigate();
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   
+  // Input section state
+  const [description, setDescription] = useState("");
+  const [mode, setMode] = useState("auto");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const currentPrompts = mode === "dl" ? DL_PROMPTS : mode === "ml" ? ML_PROMPTS : AUTO_PROMPTS;
+
+  const [placeholder, setPlaceholder] = useState(currentPrompts[0]);
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+
+  // Cycle example prompts in placeholder
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % currentPrompts.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [currentPrompts]);
+
+  useEffect(() => {
+    setPlaceholder(currentPrompts[placeholderIdx % currentPrompts.length]);
+  }, [placeholderIdx, currentPrompts]);
+
+  const handleTrain = async () => {
+    if (!description.trim()) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await axios.post("/api/train", { 
+        problem_description: description,
+        mode: mode
+      });
+      // Store result in sessionStorage so Training page can read it
+      sessionStorage.setItem("trainResult", JSON.stringify(res.data));
+      navigate("/training");
+    } catch (err) {
+      setError(err.response?.data?.error || "Training failed. Is the ML service running?");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleTrain();
+    }
+  };
+
   // 3D Parallax state
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -147,6 +220,29 @@ export default function Home() {
         @media (prefers-reduced-motion: reduce) {
           * { animation: none !important; transition: none !important; transform: none !important; }
         }
+
+        .glass {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: 1.5rem;
+        }
+
+        .input-field {
+          width: 100%;
+          background: rgba(241, 245, 249, 0.5);
+          border: 1px solid rgba(203, 213, 225, 0.5);
+          border-radius: 0.75rem;
+          padding: 1rem;
+          color: #1e293b;
+          outline: none;
+          transition: all 0.2s;
+        }
+        .input-field:focus {
+          background: #ffffff;
+          border-color: #10b981;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
       `}</style>
       
       {/* ──────────────────────────────────────────────────────────── 
@@ -186,20 +282,85 @@ export default function Home() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, type: "spring", stiffness: 100 }}
-          className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto relative z-20"
+          className="flex flex-col items-center w-full max-w-2xl relative z-20"
         >
-          <button 
-            onClick={() => navigate('/training')} 
-            className="btn-shimmer px-8 py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg shadow-[0_4px_24px_-4px_rgba(16,185,129,0.5)] transform hover:-translate-y-1 transition-transform"
-          >
-            Start New Project
-          </button>
-          <button 
-            onClick={() => navigate('/playground')} 
-            className="px-8 py-4 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-lg hover:bg-slate-50 shadow-sm transform hover:-translate-y-1 transition-all"
-          >
-            Try Demo Project
-          </button>
+          {/* Input Card ─────────────────────────────────────────────────── */}
+          <div className="glass w-full p-6 mb-4 shadow-xl border border-white/50">
+            
+            <div className="flex justify-between items-center mb-3">
+              <label className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                📝 Describe your ML problem
+              </label>
+              
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                {["auto", "ml", "dl"].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    title={MODE_CONFIG[m].desc}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${
+                      mode === m
+                        ? "bg-emerald-500 text-white shadow-lg"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    <span>{MODE_CONFIG[m].icon}</span>
+                    {m === "auto" ? "Auto" : m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode description subtitle */}
+            <p className="text-xs text-slate-500 mb-3 -mt-1 text-left">
+              {MODE_CONFIG[mode].icon}&nbsp;
+              <span className="font-semibold text-slate-400">{MODE_CONFIG[mode].label} Mode:</span>&nbsp;
+              {MODE_CONFIG[mode].desc}
+            </p>
+
+            <textarea
+              id="problem-input"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              rows={3}
+              className="input-field resize-none text-base mb-4"
+            />
+
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <button 
+                onClick={handleTrain} 
+                disabled={loading || !description.trim()}
+                className="btn-shimmer flex-1 px-8 py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg shadow-[0_4px_24px_-4px_rgba(16,185,129,0.5)] transform hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {loading ? "Initializing..." : "Start Auto-Training"}
+              </button>
+              <button 
+                onClick={() => navigate('/playground')} 
+                className="px-8 py-4 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-lg hover:bg-slate-50 shadow-sm transform hover:-translate-y-1 transition-all"
+              >
+                Try Demo
+              </button>
+            </div>
+            
+            {error && <p className="mt-3 text-rose-500 text-sm font-medium">{error}</p>}
+          </div>
+
+          {/* Example chips */}
+          <div className="flex flex-wrap justify-center gap-2 max-w-2xl">
+            <span className="text-xs text-slate-500 self-center mr-1">Try:</span>
+            {currentPrompts.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => setDescription(p)}
+                className="text-xs px-3 py-1.5 rounded-full transition-all duration-200
+                           text-slate-500 hover:text-emerald-600 bg-white border border-slate-200 hover:border-emerald-200 cursor-pointer shadow-sm"
+              >
+                {p.slice(0, 40)}…
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         {/* 3D Browser Mockup */}
@@ -466,7 +627,24 @@ export default function Home() {
           </div>
         </motion.div>
       </section>
-      
+
+      {/* Footer */}
+      <footer className="py-12 px-6 border-t border-slate-100 bg-white">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-black text-xs">AS</span>
+            </div>
+            <span className="font-black text-slate-900 tracking-tighter text-xl">AutoML Studio</span>
+          </div>
+          <p className="text-slate-400 text-sm font-medium">© 2026 AutoML Studio. Built for the future of No-Code AI.</p>
+          <div className="flex gap-6 text-slate-400 text-sm font-bold uppercase tracking-widest">
+            <a href="#" className="hover:text-emerald-500 transition-colors">Twitter</a>
+            <a href="#" className="hover:text-emerald-500 transition-colors">Discord</a>
+            <a href="#" className="hover:text-emerald-500 transition-colors">GitHub</a>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

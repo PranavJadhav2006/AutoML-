@@ -17,7 +17,7 @@ if not _kaggle_user:
 if not _kaggle_token:
     os.environ.setdefault("KAGGLE_KEY", "dummy")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from trainer import auto_train, retrain_from_artifact
@@ -25,6 +25,7 @@ from predictor import predict
 from chat_engine import chat_with_dataset
 from services.dataset_service import DatasetService
 from routes.dataset_routes import dataset_router
+from image_predictor import predict_image
 
 app = FastAPI(title="AutoML Studio ML Service", version="1.0.0")
 app.include_router(dataset_router)
@@ -41,6 +42,7 @@ app.add_middleware(
 
 class TrainRequest(BaseModel):
     problem_description: str
+    mode: str = "auto"
 
 
 class PredictRequest(BaseModel):
@@ -69,7 +71,7 @@ async def auto_train_endpoint(req: TrainRequest):
     dataset, trains multiple ML models, selects the best one, saves it,
     and returns training results.
     """
-    result = auto_train(req.problem_description)
+    result = auto_train(req.problem_description, req.mode)
     return result
 
 
@@ -81,6 +83,18 @@ async def predict_endpoint(req: PredictRequest):
     """
     result = predict(req.model_id, req.features)
     return result
+
+@app.post("/image-predict")
+async def image_predict_endpoint(
+    model_id: str = Form(...),
+    file: UploadFile = File(...)
+):
+    """
+    Accepts an uploaded image file and returns predictions using an
+    image classification model (MobileNetV2).
+    """
+    img_bytes = await file.read()
+    return predict_image(model_id, img_bytes)
 
 
 @app.post("/chat")

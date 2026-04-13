@@ -52,6 +52,9 @@ from joblib import Parallel, delayed
 from services.dataset_service       import DatasetService
 from services.preprocessing_service import Preprocessor, detect_target
 from services.visualization_service import VisualizationService
+from services.dl_service            import DLService
+from services.image_dl_service      import ImageDLService
+from services.mode_selector         import select_mode, select_mode_with_reason
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,21 +109,56 @@ def _load_digits():
     return df, "target", feature_names, "classification"
 
 
+def _load_mnist_proxy():
+    """
+    Loads MNIST as a flattened proxy for the registry and converts to PIL.
+    """
+    from sklearn.datasets import fetch_openml
+    from PIL import Image
+    import numpy as np
+    
+    X, y = fetch_openml('mnist_784', version=1, return_X_y=True, as_frame=False)
+    # Use only 1000 samples for speed
+    X, y = X[:1000], y[:1000].astype(int)
+    
+    images = []
+    for row in X:
+        arr = row.reshape(28, 28).astype(np.uint8)
+        images.append(Image.fromarray(arr).convert("RGB"))
+        
+    return {
+        "dataset": "Handwritten Digits (MNIST)",
+        "source": "sklearn",
+        "task": "image_classification",
+        "target_col": "digit",
+        "score": 100,
+        "features": ["image"],
+        "image_data": images,
+        "labels": y.tolist(),
+        "class_names": [str(i) for i in range(10)]
+    }
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Dataset registry (keyword-based fallback)
 # ─────────────────────────────────────────────────────────────────────────────
 
 DATASET_REGISTRY = [
     {
-        "keywords": ["titanic", "survival", "passenger", "ship", "survived"],
-        "name": "Titanic Survival",
-        "loader": _load_sklearn_cancer,   # closest proxy when HF fails
-        "task": "classification",
-    },
-    {
         "keywords": ["iris", "flower", "petal", "sepal", "setosa", "species"],
         "name": "Iris Flower Species",
         "loader": _load_sklearn_iris,
+        "task": "classification",
+    },
+    {
+        "keywords": ["image", "processing", "vision", "picture", "mnist", "digits", "pixel", "canvas"],
+        "name": "Handwritten Digits (Image)",
+        "loader": _load_mnist_proxy,
+        "task": "image_classification",
+    },
+    {
+        "keywords": ["titanic", "survival", "passenger", "ship", "survived"],
+        "name": "Titanic Survival",
+        "loader": _load_sklearn_cancer,
         "task": "classification",
     },
     {
@@ -176,12 +214,14 @@ DATASET_REGISTRY = [
 
 def _match_dataset_registry(description: str) -> Dict:
     desc_lower = description.lower()
-    best, best_score = None, -1
+    best, best_score = None, 0 # Require at least 1 keyword match
     for entry in DATASET_REGISTRY:
         score = sum(1 for kw in entry["keywords"] if kw in desc_lower)
         if score > best_score:
             best_score, best = score, entry
-    return best if best else DATASET_REGISTRY[1]
+    
+    # If no match in registry, fallback to a neutral dataset like Iris (index 0)
+    return best if best else DATASET_REGISTRY[0]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -391,32 +431,68 @@ def _run_training_pipeline(
 # Entry Point: Auto Train
 # ─────────────────────────────────────────────────────────────────────────────
 
-def auto_train(problem_description: str) -> Dict[str, Any]:
-    logger.info(f"=== auto_train: '{problem_description}' ===")
+def auto_train(problem_description: str, mode: str = "auto") -> Dict[str, Any]:
+    logger.info(f"=== auto_train: '{problem_description}' (mode={mode}) ===")
 
     dataset_service = DatasetService()
     df: pd.DataFrame
     
     try:
         ds_info = dataset_service.get_best_dataset(problem_description)
-        df           = ds_info["df"]
-        target_col   = ds_info["target_col"]
-        task         = ds_info["task"]
-        feature_cols = ds_info["features"]
-        dataset_name = ds_info["dataset"]
-        dataset_source = ds_info["source"]
     except Exception as exc:
         logger.warning(f"Dynamic dataset discovery failed ({exc}), falling back to registry.")
         entry = _match_dataset_registry(problem_description)
         try:
-            raw = entry["loader"]()
-            df, target_col, feature_cols, task = raw
-            dataset_name   = entry["name"]
-            dataset_source = "sklearn"
+            if entry["task"] == "image_classification":
+                ds_info = entry["loader"]()
+            else:
+                raw = entry["loader"]()
+                df, target_col, feature_cols, task = raw
+                ds_info = {
+                    "dataset": entry["name"],
+                    "source": "sklearn",
+                    "task": entry["task"],
+                    "target_col": target_col,
+                    "features": feature_cols,
+                    "df": df
+                }
         except Exception as fallback_exc:
             df, target_col, feature_cols, task = _load_sklearn_iris()
-            dataset_name   = "Iris Flower Species (fallback)"
-            dataset_source = "sklearn"
+            ds_info = {
+                "dataset": "Iris Flower Species (fallback)",
+                "source": "sklearn",
+                "task": task,
+                "target_col": target_col,
+                "features": feature_cols,
+                "df": df
+            }
+
+    task = ds_info["task"]
+    dataset_name = ds_info["dataset"]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # IMAGE PROCESSING BRANCH
+    # ─────────────────────────────────────────────────────────────────────────
+    if task == "image_classification":
+        logger.info(f"Image processing detected for {dataset_name}. Using MobileNetV2 path.")
+        
+        # ds_info contains image_data (PIL) and labels (ints), and class_names (strings)
+        dl_result = ImageDLService.train_model(
+            pil_images=ds_info["image_data"],
+            labels=ds_info["labels"],
+            class_names=ds_info["class_names"],
+            dataset_name=dataset_name,
+            source=ds_info["source"]
+        )
+        return dl_result
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TABULAR PIPELINE (ML / DL)
+    # ─────────────────────────────────────────────────────────────────────────
+    df = ds_info["df"]
+    target_col = ds_info["target_col"]
+    feature_cols = ds_info["features"]
+    dataset_source = ds_info["source"]
 
     if len(df) > 50_000:
         df = df.sample(50_000, random_state=42).reset_index(drop=True)
@@ -434,11 +510,49 @@ def auto_train(problem_description: str) -> Dict[str, Any]:
     if n_rows < 30:
         raise RuntimeError(f"Dataset too small after preprocessing: {n_rows} rows (need ≥ 30).")
 
-    return _run_training_pipeline(
-        df=df, X_full=X_full, y_full=y_full, 
-        feature_names=feature_names, target_col=target_col, task=task, 
+    # ── Mode Selection ───────────────────────────────────────────────────────
+    dataset_info = {"n_rows": n_rows, "task": task}
+    selected_mode, reason = select_mode_with_reason(mode, dataset_info)
+    logger.info(f"Mode selected: {selected_mode} | Reason: {reason}")
+
+    if selected_mode == "dl":
+        # Safety warning for very small datasets
+        warning = None
+        if n_rows < 1_000:
+            warning = (
+                f"⚠️ Dataset has only {n_rows:,} rows. "
+                "Deep learning usually underperforms ML on very small datasets. "
+                "Training time may also be longer."
+            )
+            logger.warning(warning)
+        elif mode == "dl":
+            # User explicitly chose DL — give a heads-up about time
+            warning = "Training time may be longer than ML. EarlyStopping is active (patience=2)."
+
+        logger.info("DL pipeline selected. Training may take slightly longer than ML.")
+
+        dl_result = DLService.train_model(
+            df=df, X_full=X_full, y_full=y_full,
+            feature_names=feature_names, target_col=target_col, task=task,
+            dataset_name=dataset_name, dataset_source=dataset_source,
+            prep_report=prep_report,
+            reason=reason,
+            warning=warning,
+        )
+        return dl_result
+
+    # ── ML Pipeline (default) ────────────────────────────────────────────────
+    result = _run_training_pipeline(
+        df=df, X_full=X_full, y_full=y_full,
+        feature_names=feature_names, target_col=target_col, task=task,
         dataset_name=dataset_name, dataset_source=dataset_source, prep_report=prep_report
     )
+    result["mode_selected"] = selected_mode
+    result["model_type"]    = "ML"
+    result["score"]         = result["best_score"]
+    result["reason"]        = reason
+    result["note"]          = "ML parallel pipeline used (fastest for this dataset)."
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

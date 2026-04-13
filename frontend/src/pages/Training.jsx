@@ -3,9 +3,28 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, MessageCircle, Database, CheckCircle2, Server, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 
-<<<<<<< HEAD
 // --- Constants & Config --- //
 const API_URL = "http://localhost:8000";
+
+const ML_STEPS = [
+  { id: "match",    label: "Matching dataset",           icon: "🔍" },
+  { id: "load",     label: "Loading & preprocessing",    icon: "📦" },
+  { id: "sample",   label: "Sampling 30% for speed",     icon: "⚡" },
+  { id: "train",    label: "Parallel model training",    icon: "🤖" },
+  { id: "compare",  label: "Comparing & selecting best", icon: "🏆" },
+  { id: "retrain",  label: "Retraining best on full data",icon: "🎯" },
+  { id: "save",     label: "Saving model artifact",      icon: "💾" },
+];
+
+const DL_STEPS = [
+  { id: "match",    label: "Matching dataset",            icon: "🔍" },
+  { id: "load",     label: "Loading & preprocessing",     icon: "📦" },
+  { id: "build",    label: "Building neural network",     icon: "🧠" },
+  { id: "train",    label: "Training MLP with Keras",     icon: "🔥" },
+  { id: "early",    label: "EarlyStopping monitoring",    icon: "⏱️" },
+  { id: "eval",     label: "Evaluating on full dataset",  icon: "📊" },
+  { id: "save",     label: "Saving model artifact",       icon: "💾" },
+];
 
 const DOMAINS = [
   { label: "Predict Crop Yield", fill: "Predict crop yield based on soil, rainfall, and temperature data", domain: "Agriculture", emoji: "🌾" },
@@ -16,16 +35,6 @@ const DOMAINS = [
   { label: "Monitor Energy", fill: "Predict energy consumption anomalies from IoT sensor data", domain: "IoT", emoji: "⚡" },
   { label: "Price Property", fill: "Estimate real estate prices from location and property features", domain: "Real Estate", emoji: "🏠" },
   { label: "Segment Customers", fill: "Group customers by purchase behaviour for targeted campaigns", domain: "Marketing", emoji: "🎯" }
-=======
-const TRAINING_STEPS = [
-  { id: "match",    label: "Matching dataset",          icon: "🔍" },
-  { id: "load",     label: "Loading & preprocessing",   icon: "📦" },
-  { id: "sample",   label: "Sampling 30% for speed",    icon: "⚡" },
-  { id: "train",    label: "Parallel model training",   icon: "🤖" },
-  { id: "compare",  label: "Comparing & selecting best",icon: "🏆" },
-  { id: "retrain",  label: "Retraining best on full data",icon:"🎯" },
-  { id: "save",     label: "Saving model artifact",     icon: "💾" },
->>>>>>> origin/main
 ];
 
 const SUGGESTIONS = [
@@ -49,40 +58,58 @@ const textWordOpts = {
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 120, damping: 20 } }
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default function Training() {
   const navigate = useNavigate();
-  // Unique identity mapping per lifecycle
-  const projectId = useMemo(() => crypto.randomUUID(), []);
   
-  // Generic Form State
+  // --- Training Result Mode State ---
+  const [result, setResult] = useState(null);
+  const [stepIdx, setStepIdx] = useState(-1);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  // --- Project Creation Mode State ---
+  const projectId = useMemo(() => crypto.randomUUID(), []);
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const [domain, setDomain] = useState("");
   const [dataStrategy, setDataStrategy] = useState("upload");
   const [datasetFile, setDatasetFile] = useState(null);
-  const [targetVariable, setTargetVariable] = useState("");
-  const [showTargetField, setShowTargetField] = useState(false);
-  
-  // UX State bounds
   const [activeSuggestions, setActiveSuggestions] = useState([]);
   const [showNudge, setShowNudge] = useState(false);
   const [errorUi, setErrorUi] = useState({});
   const [serverError, setServerError] = useState("");
   const textareaRef = useRef(null);
-
-  // --- Backend Intelligence State --- //
   const [isSearching, setIsSearching] = useState(false);
-  const [pipelineResult, setPipelineResult] = useState(null); // stores Search API response bounds
-  const [selectedDataset, setSelectedDataset] = useState(null);
+  const [pipelineResult, setPipelineResult] = useState(null);
   const [importingId, setImportingId] = useState(null);
-  
-  // Synthetic / Extend explicit configurations
   const [schemaEditor, setSchemaEditor] = useState(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [sseProgress, setSseProgress] = useState(null); // e.g. { step: "...", pct: 50 }
+  const [sseProgress, setSseProgress] = useState(null);
 
+  const isDL = result?.model_type === "DL";
+  const TRAINING_STEPS = isDL ? DL_STEPS : ML_STEPS;
+  const isClassification = result?.task_type === "classification";
 
   useEffect(() => {
+    const raw = sessionStorage.getItem("trainResult");
+    if (raw) {
+      const data = JSON.parse(raw);
+      setResult(data);
+
+      const steps = data?.model_type === "DL" ? DL_STEPS : ML_STEPS;
+
+      // Animate through steps
+      (async () => {
+        for (let i = 0; i < steps.length; i++) {
+          setStepIdx(i);
+          await sleep(i === 3 ? 1400 : i === 4 ? 1000 : 700);
+        }
+        setDone(true);
+      })();
+    }
+
     const handleGlobalKeyDown = (e) => {
       if (e.key === "Escape") setActiveSuggestions([]);
     };
@@ -99,10 +126,8 @@ export default function Training() {
     return score;
   }, [projectName, description, domain, dataStrategy]);
 
-  // Block out generic builds mapping cleanly enforcing datasets limits organically natively.
-  const canGenericSubmit = dataStrategy !== "auto_fetch" && completionPercent >= 50 && !isImporting;
+  const canGenericSubmit = dataStrategy !== "auto_fetch" && completionPercent >= 50 && !importingId;
 
-  // Form Field Logic
   const handleTileSelect = (tile) => {
     setDomain(tile.domain);
     setDescription(tile.fill);
@@ -167,9 +192,6 @@ export default function Training() {
     setShowNudge(false);
   };
 
-  // --- Pipeline Interaction Hooks --- //
-
-  // Chunk 1: Intelligence Search
   const handleSearchDatasets = async () => {
     if (!description.trim()) {
       setErrorUi(prev => ({ ...prev, description: true }));
@@ -214,7 +236,6 @@ export default function Training() {
     }
   };
 
-  // Chunk 2: Import Handoff
   const handleImportRealDataset = async (card) => {
     setImportingId(card.identifier);
     setServerError("");
@@ -238,9 +259,7 @@ export default function Training() {
       const data = await response.json();
       const handoff = data.chat_handoff;
       
-      // Store handoff so Chat.jsx can read it
       sessionStorage.setItem("chatHandoff", JSON.stringify(handoff));
-      // Also store trainResult in the legacy format Chat.jsx expects
       sessionStorage.setItem("trainResult", JSON.stringify({
         dataset_name: card.name || card.identifier,
         model_id: handoff?.chat_session_id || projectId,
@@ -256,7 +275,6 @@ export default function Training() {
     }
   };
 
-  // SSE Synthetics Event Source Mimicry logic
   const handleSyntheticSchemaConfirmation = async () => {
     setIsSynthesizing(true);
     setSseProgress({ step: "Initializing generation engines...", pct: 0 });
@@ -268,13 +286,12 @@ export default function Training() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: projectId,
-          confirmed_schema: schemaEditor // Assume accepted currently cleanly organically.
+          confirmed_schema: schemaEditor
         })
       });
 
-      if (!response.ok) throw new Error("Schema processing evaluation completely failed organically mapping physical boundary metrics constraints.");
+      if (!response.ok) throw new Error("Schema processing evaluation completely failed.");
 
-      // Natively parsing Server Sent Events strictly mapping cleanly natively.
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -286,7 +303,7 @@ export default function Training() {
         buffer += decoder.decode(value, { stream: true });
         
         const chunks = buffer.split('\n\n');
-        buffer = chunks.pop() || ""; // keep incomplete parts natively
+        buffer = chunks.pop() || "";
 
         for (const chunk of chunks) {
           if (chunk.startsWith("data: ")) {
@@ -321,17 +338,15 @@ export default function Training() {
       "building_seed": "Faker bounds instantiating natively...",
       "fitting_model": "Learning structural Copula array constraints via SDV...",
       "enforcing_rules": "Validating Business limits recursively...",
-      "complete": "Finalizing logic boundaries cleanly organically natively mappings evaluation execution limits..."
+      "complete": "Finalizing logic boundaries..."
     };
     return dict[step] || step;
   }
   
-  // Fallback generic project submission explicitly mappings natively evaluated bounded.
   const handleGenericSubmit = async (e) => {
     e.preventDefault();
     if (dataStrategy === "auto_fetch") return;
-    setIsImporting(true);
-    setTimeout(()=>navigate("/"), 1000); // Mock generic submit routing internally.
+    navigate("/");
   };
 
   return (
@@ -351,586 +366,328 @@ export default function Training() {
           position: fixed; inset: 0; z-index: -10; opacity: 0.04; pointer-events: none;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
+        .glass {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: 1.5rem;
+        }
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.25rem 0.75rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+        .badge-classification { background: rgba(99, 102, 241, 0.1); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .badge-regression { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-success { background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.2); }
+        .step-dot { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
+        .step-dot.active { background: #6366f1; box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
+        .step-dot.done { background: #10b981; }
+        .btn-primary {
+          background: #1e293b;
+          color: white;
+          font-weight: 700;
+          border-radius: 0.75rem;
+          transition: all 0.2s;
+        }
+        .btn-primary:hover { background: #0f172a; transform: translateY(-1px); }
+        .btn-secondary {
+          background: white;
+          color: #1e293b;
+          font-weight: 700;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.75rem;
+          transition: all 0.2s;
+        }
+        .btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; }
       `}</style>
       
       <div className="gradient-mesh"></div>
       <div className="grain-overlay"></div>
 
-      <div className="w-full max-w-none px-4 md:px-8 lg:px-16 mx-auto flex flex-col items-center">
-        {/* Header Section */}
-        <div className="w-full mb-10 text-center px-4">
-          <motion.h2 
-            variants={textContainerOpts} initial="hidden" animate="show"
-            className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-2"
-          >
-            {"Start a New Project".split(" ").map((w, i) => (
-              <motion.span key={i} className="inline-block mr-2" variants={textWordOpts}>{w}</motion.span>
-            ))}
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            className="text-slate-500 font-medium text-lg mb-6"
-          >
-            Tell us what you want to build. We'll handle the rest.
-          </motion.p>
-
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            type="button"
-            onClick={() => {
-              setProjectName("Titanic Survival Predictor");
-              setDomain("Healthcare");
-              setDescription("Predict the chance of surviving the Titanic using age, fare, and passenger class parameters.");
-              setDataStrategy("auto_fetch");
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-100/50"
-          >
-            ✨ Try an example
-          </motion.button>
-        </div>
-
-        {/* The Form Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
-          className="w-full bg-white/70 backdrop-blur-xl rounded-3xl shadow-lg border border-white/50 p-6 md:p-10 relative"
-        >
-          {serverError && (
-            <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm font-medium flex items-center justify-center gap-3 text-center">
-              <AlertTriangle className="w-5 h-5" /> {serverError}
-            </div>
-          )}
-
-          <form className="flex flex-col">
-            
-            {/* STEP 01 */}
-            <div className="pb-8 border-b border-slate-100 relative group">
-              <div className="mb-6 text-center">
-                <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">01</span>
-                <h3 className="text-slate-800 font-bold text-lg">Name your project</h3>
-              </div>
-              <div className="relative w-full max-w-3xl mx-auto">
-                <input
-                  type="text"
-                  className={`w-full text-center px-5 py-4 text-xl font-medium placeholder:text-slate-300 text-slate-800 bg-slate-50 border rounded-2xl outline-none shadow-inner ${errorUi.projectName ? 'border-rose-300 ring-4 ring-rose-500/10' : 'border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 ring-indigo-500/10'}`}
-                  placeholder="e.g. Crop Yield Predictor"
-                  value={projectName}
-                  onChange={(e) => {
-                    setProjectName(e.target.value);
-                    if(errorUi.projectName) setErrorUi(prev => ({ ...prev, projectName: false }));
-                  }}
-                />
-              </div>
-            </div>
-
-<<<<<<< HEAD
-            {/* STEP 02: Goal & Description */}
-            <div className="py-8 border-b border-slate-100 relative">
-              <div className="mb-6 text-center">
-                <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">02</span>
-                <h3 className="text-slate-800 font-bold text-xl mb-2">Define your project's goal</h3>
-                <p className="text-slate-500 font-medium">Pick a template or describe your objective in plain English below.</p>
-              </div>
-
-              {/* Templates Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2 mb-10 max-w-6xl mx-auto">
-                {DOMAINS.map(tile => {
-                  const selected = domain === tile.domain;
-                  return (
-                    <motion.button
-                      key={tile.label} type="button" whileTap={{ scale: 0.95 }} onClick={() => handleTileSelect(tile)}
-                      className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${selected ? "border-indigo-500 bg-indigo-50 shadow-sm" : "border-slate-200 bg-white hover:border-indigo-200"}`}
-                    >
-                      {selected && <div className="absolute top-2 right-2 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center"><span className="text-white text-[10px]">✓</span></div>}
-                      <span className="text-xl mb-1.5">{tile.emoji}</span>
-                      <span className={`font-semibold text-xs leading-tight ${selected ? "text-indigo-800" : "text-slate-700"}`}>{tile.label}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              <div className="relative w-full max-w-4xl mx-auto">
-                <textarea
-                  id="problemDesc" ref={textareaRef}
-                  className={`w-full px-5 py-5 text-base font-medium placeholder:text-slate-300 text-slate-800 bg-slate-50 border rounded-2xl outline-none resize-none min-h-[140px] shadow-inner text-center ${errorUi.description ? 'border-rose-300 ring-4 ring-rose-500/10' : 'border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 ring-indigo-500/10'}`}
-                  placeholder="e.g. I want to predict house prices based on location and square footage..."
-                  value={description}
-                  onChange={handleDescriptionChange}
-                  onKeyDown={handleTextareaKeyDown}
-                  onBlur={handleBlurTextarea}
-                ></textarea>
-                
-                {/* Vague Nudge */}
-                <AnimatePresence>
-                  {showNudge && (
-                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4 p-4 bg-amber-50 rounded-2xl text-sm font-medium text-amber-800 text-center flex flex-col items-center shadow-sm relative max-w-xl mx-auto">
-                      <MessageCircle className="text-amber-500 mb-1" size={20} />
-                      <div className="leading-relaxed"><span className="font-bold">Be more specific:</span> Do you want to <button type="button" onMouseDown={(e) => { e.preventDefault(); appendSuggestion("predict a value (Regression)"); }} className="underline hover:text-amber-600">predict a value</button> or <button type="button" onMouseDown={(e) => { e.preventDefault(); appendSuggestion("categorise items (Classification)"); }} className="underline hover:text-amber-600">categorise items</button>?</div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* STEP 03: Data Source */}
-            <div className="py-8 border-b border-slate-100 relative">
-              <div className="mb-6 text-center">
-                <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">03</span>
-                <h3 className="text-slate-800 font-bold text-lg">How are you bringing in data?</h3>
-              </div>
-              
-              <div className="bg-slate-100 p-1.5 rounded-2xl w-full grid grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto shadow-inner gap-1 mb-8">
-                {[
-                  { id: "auto_fetch", label: "🔍 Find a dataset" },
-                  { id: "upload", label: "📁 I have my own" }
-                ].map((opt) => (
-                  <button key={opt.id} type="button" onClick={() => setDataStrategy(opt.id)} className="relative px-2 py-3 text-sm outline-none text-center">
-                    {dataStrategy === opt.id && <motion.div layoutId="activePill" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-slate-200" transition={{ type: "spring", stiffness: 300, damping: 30 }} />}
-                    <span className={`relative z-10 font-bold transition-colors ${dataStrategy === opt.id ? 'text-slate-800' : 'text-slate-500'}`}>{opt.label}</span>
-                  </button>
+      <div className="w-full max-w-6xl px-4 mx-auto flex flex-col items-center">
+        {!result ? (
+          <>
+            {/* --- Project Creation Form --- */}
+            <div className="w-full mb-10 text-center px-4">
+              <motion.h2 
+                variants={textContainerOpts} initial="hidden" animate="show"
+                className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-2"
+              >
+                {"Start a New Project".split(" ").map((w, i) => (
+                  <motion.span key={i} className="inline-block mr-2" variants={textWordOpts}>{w}</motion.span>
                 ))}
-              </div>
-              
-              <div className="w-full flex flex-col items-center">
-                {dataStrategy === 'upload' && (
-                  <div className="w-full flex flex-col items-center">
-                    <label className="relative flex flex-col items-center justify-center w-full max-w-xl h-44 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 hover:bg-white hover:border-indigo-400 transition-all cursor-pointer group shadow-inner">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                          <Database className="text-indigo-500" size={24} />
-                        </div>
-                        <p className="mb-1 text-sm text-slate-700 font-bold">
-                          {datasetFile ? datasetFile.name : "Click to upload or drag and drop"}
-                        </p>
-                        <p className="text-xs text-slate-400 font-medium">CSV, XLS, or JSON (max. 50MB)</p>
-                      </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept=".csv,.xls,.xlsx,.json"
-                        onChange={(e) => setDatasetFile(e.target.files[0])}
-                      />
-                    </label>
-                    {datasetFile && (
-                      <div className="mt-4 flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
-                         <CheckCircle2 className="text-emerald-500" size={16} />
-                         <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">File Selected Successfully</span>
-                         <button 
-                           type="button"
-                           onClick={() => setDatasetFile(null)}
-                           className="text-xs font-bold text-slate-400 hover:text-rose-500 underline ml-2 transition-colors"
-                         >
-                           Remove
-                         </button>
-                      </div>
-                    )}
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                className="text-slate-500 font-medium text-lg mb-6"
+              >
+                Tell us what you want to build. We'll handle the rest.
+              </motion.p>
+
+              <motion.button
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                type="button"
+                onClick={() => {
+                  setProjectName("Titanic Survival Predictor");
+                  setDomain("Healthcare");
+                  setDescription("Predict the chance of surviving the Titanic using age, fare, and passenger class parameters.");
+                  setDataStrategy("auto_fetch");
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-100/50"
+              >
+                ✨ Try an example
+              </motion.button>
+            </div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
+              className="w-full bg-white/70 backdrop-blur-xl rounded-3xl shadow-lg border border-white/50 p-6 md:p-10 relative"
+            >
+              {serverError && (
+                <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm font-medium flex items-center justify-center gap-3 text-center">
+                  <AlertTriangle className="w-5 h-5" /> {serverError}
+                </div>
+              )}
+
+              <form className="flex flex-col">
+                {/* STEP 01 */}
+                <div className="pb-8 border-b border-slate-100 relative group">
+                  <div className="mb-6 text-center">
+                    <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">01</span>
+                    <h3 className="text-slate-800 font-bold text-lg">Name your project</h3>
                   </div>
-                )}
+                  <div className="relative w-full max-w-3xl mx-auto">
+                    <input
+                      type="text"
+                      className={`w-full text-center px-5 py-4 text-xl font-medium placeholder:text-slate-300 text-slate-800 bg-slate-50 border rounded-2xl outline-none shadow-inner ${errorUi.projectName ? 'border-rose-300 ring-4 ring-rose-500/10' : 'border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 ring-indigo-500/10'}`}
+                      placeholder="e.g. Crop Yield Predictor"
+                      value={projectName}
+                      onChange={(e) => {
+                        setProjectName(e.target.value);
+                        if(errorUi.projectName) setErrorUi(prev => ({ ...prev, projectName: false }));
+                      }}
+                    />
+                  </div>
+                </div>
 
-                {dataStrategy === 'auto_fetch' && (
-                  <div className="w-full flex flex-col items-center">
-                    <button
-                      type="button" onClick={handleSearchDatasets} disabled={isSearching}
-                      className={`px-8 py-4 rounded-full font-black text-sm flex items-center justify-center gap-2 transition-all shadow-md w-full max-w-sm ${isSearching ? "bg-slate-200 text-slate-400" : "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:shadow-lg hover:scale-[1.02]"}`}
-                    >
-                      {isSearching ? <><Loader2 className="animate-spin" size={18}/> Searching Engines...</> : <><Sparkles size={18}/> Search for Matching Datasets</>}
-                    </button>
+                {/* STEP 02: Goal & Description */}
+                <div className="py-8 border-b border-slate-100 relative">
+                  <div className="mb-6 text-center">
+                    <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">02</span>
+                    <h3 className="text-slate-800 font-bold text-xl mb-2">Define your project's goal</h3>
+                  </div>
 
-                    <AnimatePresence mode="popLayout">
-                      {pipelineResult?.mode === "fetch" && pipelineResult.dataset_cards && (
-                        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-10 w-full max-w-5xl text-center">
-                          <span className="bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-sm border border-indigo-100">Top Matches Extracted</span>
-                          
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                            {pipelineResult.dataset_cards.map((ds, idx) => (
-                              <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 p-6 flex flex-col text-left group">
-                                <div className="flex items-center gap-3 mb-4">
-                                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg">{ds.source === 'kaggle' ? 'K' : ds.source === 'huggingface' ? '🤗' : 'O'}</div>
-                                  <div>
-                                    <h4 className="font-bold text-slate-800 text-sm line-clamp-1" title={ds.name}>{ds.name}</h4>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ds.source}</span>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-500 mb-4 line-clamp-3 leading-relaxed flex-1">{ds.description}</p>
-                                
-                                <div className="bg-slate-50 rounded-xl p-3 mb-6 space-y-2">
-                                  <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
-                                    <span className="text-slate-400">Health Score</span>
-                                    <span className={ds.health_score > 0.6 ? "text-emerald-500" : "text-amber-500"}>{(ds.health_score * 100).toFixed(0)}%</span>
-                                  </div>
-                                  
-                                  {ds.estimated_rows > 0 && (
-                                    <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
-                                      <span className="text-slate-400">Lines Estimated</span>
-                                      <span className="text-slate-700">{ds.estimated_rows.toLocaleString()}</span>
-                                    </div>
-                                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2 mb-10 max-w-6xl mx-auto">
+                    {DOMAINS.map(tile => {
+                      const selected = domain === tile.domain;
+                      return (
+                        <motion.button
+                          key={tile.label} type="button" whileTap={{ scale: 0.95 }} onClick={() => handleTileSelect(tile)}
+                          className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${selected ? "border-indigo-500 bg-indigo-50 shadow-sm" : "border-slate-200 bg-white hover:border-indigo-200"}`}
+                        >
+                          {selected && <div className="absolute top-2 right-2 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center"><span className="text-white text-[10px]">✓</span></div>}
+                          <span className="text-xl mb-1.5">{tile.emoji}</span>
+                          <span className={`font-semibold text-xs leading-tight ${selected ? "text-indigo-800" : "text-slate-700"}`}>{tile.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
 
-
-                                  {ds.size_bytes > 0 && (
-                                    <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
-                                      <span className="text-slate-400">Data Size</span>
-                                      <span className="text-slate-700">
-                                        {ds.size_bytes > 1024 * 1024 * 1024 
-                                          ? `${(ds.size_bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
-                                          : ds.size_bytes > 1024 * 1024
-                                            ? `${(ds.size_bytes / (1024 * 1024)).toFixed(1)} MB`
-                                            : `${(ds.size_bytes / 1024).toFixed(0)} KB`}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {ds.downloads_metric > 0 && (
-                                    <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
-                                      <span className="text-slate-400">Popularity</span>
-                                      <span className="text-slate-700">{ds.downloads_metric.toLocaleString()} Downloads</span>
-                                    </div>
-                                  )}
-
-                                  {ds.size_alert && <div className="text-[10px] font-bold text-rose-500 text-center mt-2 flex items-center justify-center gap-1"><AlertTriangle size={12}/> File Size heavily intensive</div>}
-                                </div>
-                                
-                                <button
-                                  type="button" disabled={!!importingId} onClick={() => handleImportRealDataset(ds)}
-                                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all focus:outline-none focus:ring-4 ring-emerald-500/20 ${importingId === ds.identifier ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-500 hover:text-white border border-emerald-200 hover:border-transparent'}`}
-                                >
-                                  {importingId === ds.identifier ? "Processing Hook..." : "Import & Execute Handoff"}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {(pipelineResult?.mode === "extend" || pipelineResult?.mode === "synthesize") && schemaEditor && (
-                        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-10 w-full max-w-4xl bg-indigo-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
-                          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl"></div>
-                          <div className="relative z-10 flex flex-col items-center">
-                            <Database className="w-12 h-12 text-teal-400 mb-6" />
-                            <h3 className="text-2xl font-black text-white mb-2 text-center">Cold Start Synthesis Protocol Required</h3>
-                            <p className="text-indigo-200 text-sm font-medium text-center mb-10 max-w-xl">
-                              {pipelineResult.mode === "extend" 
-                                ? "The physical datasets bounded organically didn't contain adequate sampling limits organically matching your parameter needs natively cleanly. We designed a pure SDV copula extension mapped to your requirements automatically natively."
-                                : "No pure physical structures exactly bounded your explicit constraints logically automatically structurally mapped. The LLM uniquely mapped realistic SDV mathematical dimensions organically natively explicitly."}
-                            </p>
-
-                            <div className="w-full bg-slate-900/50 backdrop-blur-md rounded-2xl p-6 border border-white/10 mb-8 max-w-2xl text-left">
-                              <h4 className="text-sm font-bold text-teal-400 uppercase tracking-widest mb-4">Proposed Target Schema Payload Configuration</h4>
-                              <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div><span className="text-[10px] text-indigo-300 uppercase font-black tracking-wider block mb-1">Target Dimension Column Constraints</span><span className="font-bold text-white bg-white/5 py-1 px-3 rounded-lg block">{schemaEditor.target_column || "None"}</span></div>
-                                <div><span className="text-[10px] text-indigo-300 uppercase font-black tracking-wider block mb-1">Row Generation Matrix Depth Dimension</span><span className="font-bold text-white bg-white/5 py-1 px-3 rounded-lg block">{(schemaEditor.suggested_row_count || 5000).toLocaleString()} Rows</span></div>
-                              </div>
-                              
-                              <div className="space-y-2 mt-6">
-                                <span className="text-[10px] text-indigo-300 uppercase font-black tracking-wider block mb-2">Column Architectures</span>
-                                {schemaEditor.columns.map((col, idx) => (
-                                  <div key={col.name} className="flex justify-between items-center bg-white/5 p-3 rounded-xl">
-                                    <div>
-                                      <span className="text-sm font-bold block text-white">{col.name}</span>
-                                      {col.business_rule && <span className="text-[10px] text-amber-200 font-mono mt-1 opacity-80 border border-amber-900 bg-amber-900/20 px-1.5 rounded">{col.business_rule}</span>}
-                                    </div>
-                                    <span className="text-xs font-mono text-teal-300 bg-teal-900/30 px-2 py-1 rounded-md">{col.dtype}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {!isSynthesizing ? (
-                              <button
-                                type="button" onClick={handleSyntheticSchemaConfirmation}
-                                className="px-8 py-4 bg-teal-500 hover:bg-teal-400 text-slate-900 font-black rounded-xl w-full max-w-md transition-all flex justify-center items-center gap-2 hover:shadow-[0_0_20px_rgba(45,212,191,0.4)]"
-                              >
-                                <CheckCircle2 size={18} /> Confirm & Execute SDV Synthesis Engine
-                              </button>
-                            ) : (
-                              <div className="w-full max-w-md bg-white/10 p-5 rounded-2xl border border-white/20 text-center">
-                                <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto mb-3" />
-                                <p className="text-sm font-bold text-white tracking-widest">{sseProgress?.step || "Evaluating parameters..."}</p>
-                                {sseProgress?.pct !== undefined && (
-                                  <div className="mt-4 h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                                    <motion.div initial={{ width: 0 }} animate={{ width: `${sseProgress.pct}%` }} className="h-full bg-teal-400 transition-all duration-300" />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                          </div>
+                  <div className="relative w-full max-w-4xl mx-auto">
+                    <textarea
+                      id="problemDesc" ref={textareaRef}
+                      className={`w-full px-5 py-5 text-base font-medium placeholder:text-slate-300 text-slate-800 bg-slate-50 border rounded-2xl outline-none resize-none min-h-[140px] shadow-inner text-center ${errorUi.description ? 'border-rose-300 ring-4 ring-rose-500/10' : 'border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 ring-indigo-500/10'}`}
+                      placeholder="e.g. I want to predict house prices based on location and square footage..."
+                      value={description}
+                      onChange={handleDescriptionChange}
+                      onKeyDown={handleTextareaKeyDown}
+                      onBlur={handleBlurTextarea}
+                    ></textarea>
+                    
+                    <AnimatePresence>
+                      {showNudge && (
+                        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4 p-4 bg-amber-50 rounded-2xl text-sm font-medium text-amber-800 text-center flex flex-col items-center shadow-sm relative max-w-xl mx-auto">
+                          <MessageCircle className="text-amber-500 mb-1" size={20} />
+                          <div className="leading-relaxed"><span className="font-bold">Be more specific:</span> Do you want to <button type="button" onMouseDown={(e) => { e.preventDefault(); appendSuggestion("predict a value (Regression)"); }} className="underline hover:text-amber-600">predict a value</button> or <button type="button" onMouseDown={(e) => { e.preventDefault(); appendSuggestion("categorise items (Classification)"); }} className="underline hover:text-amber-600">categorise items</button>?</div>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
-                )}
+                </div>
+
+                {/* STEP 03: Data Source */}
+                <div className="py-8 border-b border-slate-100 relative">
+                  <div className="mb-6 text-center">
+                    <span className="inline-block bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md text-xs tracking-widest font-mono mb-2">03</span>
+                    <h3 className="text-slate-800 font-bold text-lg">How are you bringing in data?</h3>
+                  </div>
+                  
+                  <div className="bg-slate-100 p-1.5 rounded-2xl w-full grid grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto shadow-inner gap-1 mb-8">
+                    {[
+                      { id: "auto_fetch", label: "🔍 Find a dataset" },
+                      { id: "upload", label: "📁 I have my own" }
+                    ].map((opt) => (
+                      <button key={opt.id} type="button" onClick={() => setDataStrategy(opt.id)} className="relative px-2 py-3 text-sm outline-none text-center">
+                        {dataStrategy === opt.id && <motion.div layoutId="activePill" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-slate-200" transition={{ type: "spring", stiffness: 300, damping: 30 }} />}
+                        <span className={`relative z-10 font-bold transition-colors ${dataStrategy === opt.id ? 'text-slate-800' : 'text-slate-500'}`}>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="w-full flex flex-col items-center">
+                    {dataStrategy === 'upload' && (
+                      <div className="w-full flex flex-col items-center">
+                        <label className="relative flex flex-col items-center justify-center w-full max-w-xl h-44 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 hover:bg-white hover:border-indigo-400 transition-all cursor-pointer group shadow-inner">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                              <Database className="text-indigo-500" size={24} />
+                            </div>
+                            <p className="mb-1 text-sm text-slate-700 font-bold">
+                              {datasetFile ? datasetFile.name : "Click to upload or drag and drop"}
+                            </p>
+                            <p className="text-xs text-slate-400 font-medium">CSV, XLS, or JSON (max. 50MB)</p>
+                          </div>
+                          <input type="file" className="hidden" accept=".csv,.xls,.xlsx,.json" onChange={(e) => setDatasetFile(e.target.files[0])} />
+                        </label>
+                      </div>
+                    )}
+
+                    {dataStrategy === 'auto_fetch' && (
+                      <div className="w-full flex flex-col items-center">
+                        <button
+                          type="button" onClick={handleSearchDatasets} disabled={isSearching}
+                          className={`px-8 py-4 rounded-full font-black text-sm flex items-center justify-center gap-2 transition-all shadow-md w-full max-w-sm ${isSearching ? "bg-slate-200 text-slate-400" : "bg-indigo-600 text-white hover:shadow-lg"}`}
+                        >
+                          {isSearching ? <><Loader2 className="animate-spin" size={18}/> Searching...</> : <><Sparkles size={18}/> Search Datasets</>}
+                        </button>
+                        
+                        <AnimatePresence>
+                          {pipelineResult?.mode === "fetch" && pipelineResult.dataset_cards && (
+                            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                              {pipelineResult.dataset_cards.map((ds, idx) => (
+                                <div key={idx} className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col shadow-sm hover:shadow-md transition-all">
+                                  <h4 className="font-bold text-slate-800 text-sm mb-2">{ds.name}</h4>
+                                  <p className="text-xs text-slate-500 mb-4 line-clamp-2">{ds.description}</p>
+                                  <button
+                                    type="button" onClick={() => handleImportRealDataset(ds)}
+                                    className="mt-auto w-full py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all"
+                                  >
+                                    Import Dataset
+                                  </button>
+                                </div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-8 w-full flex justify-center">
+                  <button
+                    type="submit" disabled={!canGenericSubmit} onClick={handleGenericSubmit}
+                    className={`w-full max-w-xs py-4 rounded-xl text-sm font-black transition-all ${canGenericSubmit ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400'}`}
+                  >
+                    Create Project &rarr;
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        ) : (
+          /* --- Training Results View --- */
+          <div className="w-full">
+            <div className="mb-10 fade-up">
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <span className={`badge ${isClassification ? "badge-classification" : "badge-regression"}`}>
+                  {isClassification ? "🏷️ Classification" : "📉 Regression"}
+                </span>
+                <span className="badge badge-success">
+                  ✅ {result?.best_model}
+                </span>
+                <span className="badge" style={{ background: isDL ? "rgba(139,92,246,0.18)" : "rgba(99,102,241,0.18)", color: isDL ? "#8b5cf6" : "#6366f1" }}>
+                  {isDL ? "🧠 Deep Learning" : "🤖 Machine Learning"}
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-2">
+                Training <span className="text-indigo-600">Complete</span>
+              </h1>
+              <p className="text-slate-500 font-medium">
+                Dataset: <span className="text-slate-900 font-bold">{result?.dataset_name}</span>
+                &nbsp;·&nbsp; {result?.dataset_rows?.toLocaleString()} rows
+              </p>
+            </div>
+
+            <div className="glass p-8 mb-8">
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Pipeline Progress</h2>
+              <div className="flex flex-col gap-5">
+                {TRAINING_STEPS.map((step, i) => {
+                  const status = i < stepIdx ? "done" : i === stepIdx ? "active" : "pending";
+                  return (
+                    <div key={step.id} className="flex items-center gap-4">
+                      <div className={`step-dot ${status}`} />
+                      <span className={`text-lg ${status === 'pending' ? 'opacity-30' : 'opacity-100'}`}>{step.icon}</span>
+                      <span className={`text-sm font-bold ${status === 'done' ? 'text-emerald-600' : status === 'active' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                        {step.label}
+                      </span>
+                      {status === 'active' && <Loader2 className="w-4 h-4 animate-spin text-indigo-600 ml-auto" />}
+                      {status === 'done' && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-auto" />}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Legacy Fallback Submission Footer */}
-            {dataStrategy !== "auto_fetch" && (
-              <div className="pt-8 mt-2 w-full max-w-3xl mx-auto flex justify-center">
-                <button
-                  type="button" disabled={!canGenericSubmit} onClick={handleGenericSubmit}
-                  className={`w-full max-w-xs py-4 rounded-xl text-sm font-black transition-all duration-200 ${(canGenericSubmit) ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                >
-                  Continuously Submit Legacy Parameter Limits &rarr;
-                </button>
-              </div>
-            )}
-
-          </form>
-        </motion.div>
-      </div>
-=======
-          {/* ── Smart Preprocessing Report ── */}
-          {result.preprocessing && (
-            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.16s" }}>
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5">
-                🧠 Smart Preprocessing Report
-              </h2>
-
-              {/* Dataset Analysis row */}
-              {result.preprocessing.dataset_analysis && (
-                <div
-                  className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 p-3 rounded-xl"
-                  style={{ background: "rgba(15,23,42,0.5)", border: "1px solid rgba(51,65,85,0.4)" }}
-                >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="glass p-8">
+                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Model Info</h2>
+                <dl className="space-y-4">
                   {[
-                    ["Rows", result.preprocessing.dataset_analysis.size?.toLocaleString(), "📦"],
-                    ["Numeric Cols", result.preprocessing.dataset_analysis.num_cols, "🔢"],
-                    ["Categoric Cols", result.preprocessing.dataset_analysis.cat_cols, "🏷️"],
-                    ["Pre-scaled?", result.preprocessing.dataset_analysis.is_scaled ? "Yes" : "No", "📐"],
-                  ].map(([label, val, icon]) => (
-                    <div key={label} className="text-center">
-                      <div className="text-lg mb-1">{icon}</div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wide">{label}</div>
-                      <div className="text-sm font-bold text-slate-200 mt-0.5">{val ?? "—"}</div>
+                    ["Model ID", result.model_id],
+                    ["Best Algorithm", result.best_model],
+                    ["Engine", result.model_type === "DL" ? "Deep Learning (Keras)" : "Machine Learning"],
+                    ["Mode Used", result.mode_selected?.toUpperCase()],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between border-b border-slate-100 pb-2">
+                      <dt className="text-xs font-bold text-slate-500 uppercase">{k}</dt>
+                      <dd className="text-sm font-mono font-bold text-slate-900">{v}</dd>
                     </div>
                   ))}
+                </dl>
+              </div>
+
+              {result.model_comparison && (
+                <div className="glass p-8">
+                  <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Leaderboard</h2>
+                  <div className="space-y-3">
+                    {Object.entries(result.model_comparison)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([name, score], idx) => (
+                        <div key={name} className={`flex items-center gap-3 p-3 rounded-xl border ${name === result.best_model ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-slate-100'}`}>
+                          <span className="font-bold text-slate-400 w-4">{idx + 1}</span>
+                          <span className="text-sm font-bold text-slate-800 flex-1">{name}</span>
+                          <span className="text-sm font-mono font-black text-indigo-600">{score.toFixed(4)}</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
-
-              {/* Decision chips */}
-              <div className="flex flex-wrap gap-2">
-                {/* Target column */}
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.35)", color: "#a5b4fc" }}>
-                  🎯 Target: <span className="font-mono">{result.preprocessing.target_column}</span>
-                </span>
-
-                {/* Missing values */}
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  result.preprocessing.missing_handled
-                    ? "text-amber-300"
-                    : "text-slate-500"
-                }`}
-                  style={{
-                    background: result.preprocessing.missing_handled ? "rgba(245,158,11,0.12)" : "rgba(51,65,85,0.3)",
-                    border: result.preprocessing.missing_handled ? "1px solid rgba(245,158,11,0.3)" : "1px solid rgba(51,65,85,0.4)",
-                  }}>
-                  {result.preprocessing.missing_handled
-                    ? `✅ Missing filled (${result.preprocessing.values_filled ?? 0} values)`
-                    : "⬜ No missing values"}
-                </span>
-
-                {/* Encoding */}
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  result.preprocessing.categorical_encoded > 0 ? "text-violet-300" : "text-slate-500"
-                }`}
-                  style={{
-                    background: result.preprocessing.categorical_encoded > 0 ? "rgba(139,92,246,0.12)" : "rgba(51,65,85,0.3)",
-                    border: result.preprocessing.categorical_encoded > 0 ? "1px solid rgba(139,92,246,0.3)" : "1px solid rgba(51,65,85,0.4)",
-                  }}>
-                  {result.preprocessing.categorical_encoded > 0
-                    ? `✅ Encoded ${result.preprocessing.categorical_encoded} cat. col(s)`
-                    : "⬜ No encoding needed"}
-                </span>
-
-                {/* Scaling */}
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  result.preprocessing.scaling_applied ? "text-emerald-300" : "text-slate-500"
-                }`}
-                  style={{
-                    background: result.preprocessing.scaling_applied ? "rgba(16,185,129,0.12)" : "rgba(51,65,85,0.3)",
-                    border: result.preprocessing.scaling_applied ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(51,65,85,0.4)",
-                  }}>
-                  {result.preprocessing.scaling_applied
-                    ? "✅ StandardScaler applied"
-                    : "⬜ Scaling skipped (already normalised)"}
-                </span>
-
-                {/* Outliers */}
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  result.preprocessing.outliers_removed > 0 ? "text-rose-300" : "text-slate-500"
-                }`}
-                  style={{
-                    background: result.preprocessing.outliers_removed > 0 ? "rgba(244,63,94,0.12)" : "rgba(51,65,85,0.3)",
-                    border: result.preprocessing.outliers_removed > 0 ? "1px solid rgba(244,63,94,0.3)" : "1px solid rgba(51,65,85,0.4)",
-                  }}>
-                  {result.preprocessing.outliers_removed > 0
-                    ? `✅ ${result.preprocessing.outliers_removed} outlier rows removed (IQR)`
-                    : "⬜ Outlier removal skipped (< 1000 rows)"}
-                </span>
-              </div>
             </div>
-          )}
 
-          {/* ── Model Comparison ── */}
-          {result.model_comparison && Object.keys(result.model_comparison).length > 0 && (
-            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.17s" }}>
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5">
-                🏆 Model Comparison
-              </h2>
-
-              {/* Best-model callout */}
-              <div
-                className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl"
-                style={{
-                  background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(16,185,129,0.12))",
-                  border: "1px solid rgba(99,102,241,0.35)",
-                }}
-              >
-                <span className="text-2xl">🥇</span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Best Model</p>
-                  <p className="text-lg font-bold text-brand-300">{result.best_model}</p>
-                </div>
-                <div className="ml-auto text-right">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                    {result.task_type === "classification" ? "Accuracy" : "R² Score"}
-                  </p>
-                  <p className="text-2xl font-black text-accent-400">
-                    {result.model_comparison[result.best_model]?.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Leaderboard rows */}
-              <div className="flex flex-col gap-3">
-                {Object.entries(result.model_comparison)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([name, score], idx) => {
-                    const isWinner = name === result.best_model;
-                    const maxScore = Math.max(...Object.values(result.model_comparison));
-                    const barWidth = maxScore > 0 ? (score / maxScore) * 100 : 0;
-                    const medals = ["🥇", "🥈", "🥉"];
-                    return (
-                      <div
-                        key={name}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200"
-                        style={{
-                          background: isWinner
-                            ? "rgba(99,102,241,0.12)"
-                            : "rgba(15,23,42,0.5)",
-                          border: isWinner
-                            ? "1px solid rgba(99,102,241,0.3)"
-                            : "1px solid rgba(51,65,85,0.4)",
-                        }}
-                      >
-                        {/* Rank medal */}
-                        <span className="text-lg w-6 text-center flex-shrink-0">
-                          {medals[idx] ?? `#${idx + 1}`}
-                        </span>
-
-                        {/* Name */}
-                        <span
-                          className={`text-sm font-semibold w-36 flex-shrink-0 ${
-                            isWinner ? "text-brand-300" : "text-slate-300"
-                          }`}
-                        >
-                          {name}
-                        </span>
-
-                        {/* Bar */}
-                        <div className="flex-1 h-2 rounded-full bg-slate-700/60 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${barWidth}%`,
-                              background: isWinner
-                                ? "linear-gradient(90deg, #6366f1, #10b981)"
-                                : "linear-gradient(90deg, #475569, #94a3b8)",
-                            }}
-                          />
-                        </div>
-
-                        {/* Score */}
-                        <span
-                          className={`text-sm font-mono font-bold w-14 text-right flex-shrink-0 ${
-                            isWinner ? "text-accent-400" : "text-slate-400"
-                          }`}
-                        >
-                          {score.toFixed(4)}
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
+            <div className="flex flex-wrap gap-4">
+              <Link to="/playground" className="btn-primary py-4 px-10 text-center">Open Playground</Link>
+              <Link to="/chat" className="btn-secondary py-4 px-10 text-center">Chat with Dataset</Link>
+              <button onClick={() => { sessionStorage.removeItem("trainResult"); window.location.reload(); }} className="btn-secondary py-4 px-10">Train New Model</button>
             </div>
-          )}
-
-          {/* Data Insights */}
-          {result.plots && Object.keys(result.plots).length > 0 && (
-            <div className="glass p-6 mb-8 fade-up" style={{ animationDelay: "0.18s" }}>
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                📊 Data Insights
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {result.plots.heatmap && (
-                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
-                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Correlation Heatmap</h3>
-                    <img src={result.plots.heatmap} alt="Correlation Heatmap" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
-                  </div>
-                )}
-                {result.plots.feature_importance && (
-                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
-                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Importance</h3>
-                    <img src={result.plots.feature_importance} alt="Feature Importance" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
-                  </div>
-                )}
-                {result.plots.distribution && (
-                  <div className="flex flex-col items-center md:col-span-2 bg-slate-900/30 p-2 rounded-xl">
-                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Feature Distributions</h3>
-                    <img src={result.plots.distribution} alt="Feature Distributions" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.01]" />
-                  </div>
-                )}
-                {result.plots.target && (
-                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
-                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Target Distribution</h3>
-                    <img src={result.plots.target} alt="Target Distribution" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
-                  </div>
-                )}
-                {result.plots.missing && (
-                  <div className="flex flex-col items-center bg-slate-900/30 p-2 rounded-xl">
-                    <h3 className="text-xs text-slate-400 font-semibold uppercase mb-2 tracking-wide w-full px-2">Missing Values</h3>
-                    <img src={result.plots.missing} alt="Missing Values" className="rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.5)] max-w-full h-auto border border-slate-700/30 transition-transform duration-300 hover:scale-[1.02]" />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* CTA buttons */}
-          <div className="flex flex-wrap gap-4 fade-up" style={{ animationDelay: "0.2s" }}>
-            <Link
-              to="/playground"
-              id="go-to-playground-btn"
-              className="btn-primary text-base py-3.5 px-8"
-            >
-              🎮 Open Playground
-            </Link>
-            <Link
-              to="/chat"
-              id="go-to-chat-btn"
-              className="btn-secondary text-base py-3.5 px-8"
-            >
-              💬 Chat with Dataset
-            </Link>
-            <Link to="/" className="btn-secondary text-base py-3.5 px-8">
-              🔁 Train New Model
-            </Link>
           </div>
-        </>
-      )}
->>>>>>> origin/main
+        )}
+      </div>
     </main>
   );
 }
