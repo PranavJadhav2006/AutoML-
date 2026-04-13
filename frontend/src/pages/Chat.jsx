@@ -2,23 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
-const SUGGESTED_QUESTIONS = [
-  "What are the feature names?",
-  "How many rows are in the dataset?",
-  "What is the class distribution?",
-  "Which columns have missing values?",
-  "Describe the dataset statistics",
-  "What is the correlation between features?",
-  "What is the mean of the features?",
-  "What is this dataset?",
-];
+const ML_URL = "http://localhost:8000";
 
 function DataTable({ data }) {
   if (!data || typeof data !== "object") return null;
   const keys = Object.keys(data);
   if (keys.length === 0) return null;
 
-  // Detect nested object (like describe output)
   const isNested = typeof data[keys[0]] === "object" && data[keys[0]] !== null;
 
   if (isNested) {
@@ -79,7 +69,6 @@ function ChatMessage({ msg }) {
         </div>
       )}
       <div className={isUser ? "chat-bubble-user" : "chat-bubble-ai max-w-2xl"}>
-        {/* Markdown-ish: bold */}
         <p className="whitespace-pre-wrap leading-relaxed"
            dangerouslySetInnerHTML={{
              __html: msg.content
@@ -101,24 +90,53 @@ function ChatMessage({ msg }) {
 
 export default function Chat() {
   const navigate = useNavigate();
-  const [result, setResult] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [sessionData, setSessionData] = useState(null);   // holds trainResult
+  const [handoff, setHandoff]         = useState(null);   // holds chatHandoff
+  const [messages, setMessages]       = useState([]);
+  const [suggestedQueries, setSuggestedQueries] = useState([]);
+  const [input, setInput]             = useState("");
+  const [loading, setLoading]         = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("trainResult");
-    if (!raw) { navigate("/"); return; }
-    const data = JSON.parse(raw);
-    setResult(data);
+    // --- Read both storage keys ---
+    const rawHandoff = sessionStorage.getItem("chatHandoff");
+    const rawResult  = sessionStorage.getItem("trainResult");
 
-    // Welcome message
-    setMessages([{
-      role: "ai",
-      content: `👋 Hi! I'm your dataset assistant for **${data.dataset_name}**.\n\nYou can ask me questions about the data — distributions, statistics, missing values, correlations, and more.\n\nTry one of the suggested questions below!`,
-      data: null,
-    }]);
+    if (!rawHandoff && !rawResult) {
+      navigate("/training");
+      return;
+    }
+
+    let parsedHandoff = null;
+    let parsedResult  = null;
+
+    if (rawHandoff) parsedHandoff = JSON.parse(rawHandoff);
+    if (rawResult)  parsedResult  = JSON.parse(rawResult);
+
+    // Prefer handoff data from the new intelligent pipeline
+    if (parsedHandoff) {
+      setHandoff(parsedHandoff);
+      setSuggestedQueries(parsedHandoff.suggested_queries || []);
+      setMessages([{
+        role: "ai",
+        content: parsedHandoff.first_message || `Your dataset is loaded and ready. Ask me anything about the data!`,
+        data: null
+      }]);
+    }
+
+    // Always set session data for context (model_id etc.)
+    if (parsedResult) {
+      setSessionData(parsedResult);
+      // If no handoff, fall back to legacy welcome
+      if (!parsedHandoff) {
+        setMessages([{
+          role: "ai",
+          content: `👋 Hi! I'm your dataset assistant for **${parsedResult.dataset_name}**.\n\nYou can ask me questions about the data — distributions, statistics, missing values, correlations, and more.\n\nTry one of the suggested questions below!`,
+          data: null
+        }]);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -133,18 +151,34 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const res = await axios.post("/api/chat", {
-        model_id: result.model_id,
-        question: q,
-      });
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", content: res.data.answer, data: res.data.data },
-      ]);
+      // New pipeline: use /api/chat-dataset with dataset_path
+      if (handoff?.dataset_path) {
+        const res = await axios.post(`${ML_URL}/api/dataset/chat`, {
+          dataset_path: handoff.dataset_path,
+          question: q,
+          session_id: handoff.chat_session_id
+        });
+        setMessages((prev) => [
+          ...prev,
+          { role: "ai", content: res.data.answer || res.data.response || JSON.stringify(res.data), data: res.data.data || null }
+        ]);
+      } else if (sessionData?.model_id) {
+        // Legacy fallback
+        const res = await axios.post("/api/chat", {
+          model_id: sessionData.model_id,
+          question: q,
+        });
+        setMessages((prev) => [
+          ...prev,
+          { role: "ai", content: res.data.answer, data: res.data.data }
+        ]);
+      } else {
+        throw new Error("No active session found.");
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: "⚠️ Failed to get a response. Is the ML service running?", data: null },
+        { role: "ai", content: `⚠️ ${err.response?.data?.detail || err.message || "Failed to get a response. Is the ML service running?"}`, data: null }
       ]);
     } finally {
       setLoading(false);
@@ -158,7 +192,14 @@ export default function Chat() {
     }
   };
 
-  if (!result) return null;
+  // Display name
+  const datasetName = handoff?.profile_summary
+    ? (sessionData?.dataset_name || "Your Dataset")
+    : sessionData?.dataset_name || "Dataset";
+
+  const profileSummary = handoff?.profile_summary;
+
+  if (!sessionData && !handoff) return null;
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-12 flex flex-col h-[calc(100vh-64px)]">
@@ -170,35 +211,44 @@ export default function Chat() {
             <h1 className="text-3xl font-black text-slate-100 mb-1">
               Chat with <span className="gradient-text">Dataset</span>
             </h1>
-            <p className="text-slate-400 text-sm">
-              {result.dataset_name} · {result.feature_names?.length} features · Model: 
-              <code className="text-brand-300 ml-1">{result.model_id}</code>
+            <p className="text-slate-400 text-sm flex items-center gap-3">
+              <span>📂 {datasetName}</span>
+              {profileSummary?.row_count && (
+                <span>· {profileSummary.row_count.toLocaleString()} rows</span>
+              )}
+              {profileSummary?.col_count && (
+                <span>· {profileSummary.col_count} columns</span>
+              )}
+              {profileSummary?.target_col && (
+                <span>· Target: <code className="text-brand-300">{profileSummary.target_col}</code></span>
+              )}
             </p>
           </div>
-          <Link to="/playground" className="btn-secondary text-sm py-2">
-            🎮 Playground
+          <Link to="/training" className="btn-secondary text-sm py-2">
+            ← New Dataset
           </Link>
         </div>
       </div>
 
-      {/* Suggested questions */}
-      <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0 fade-up" style={{ animationDelay: "0.05s" }}>
-        {SUGGESTED_QUESTIONS.slice(0, 5).map((q) => (
-          <button
-            key={q}
-            onClick={() => sendMessage(q)}
-            disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-full transition-all duration-200
-                       text-slate-400 hover:text-slate-200 cursor-pointer disabled:opacity-40"
-            style={{
-              background: "rgba(99,102,241,0.08)",
-              border: "1px solid rgba(99,102,241,0.15)",
-            }}
-          >
-            {q}
-          </button>
-        ))}
-      </div>
+      {/* Suggested queries */}
+      {suggestedQueries.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0 fade-up" style={{ animationDelay: "0.05s" }}>
+          {suggestedQueries.map((q) => (
+            <button
+              key={q}
+              onClick={() => sendMessage(q)}
+              disabled={loading}
+              className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-200 cursor-pointer disabled:opacity-40"
+              style={{
+                background: "rgba(99,102,241,0.08)",
+                border: "1px solid rgba(99,102,241,0.15)",
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="glass flex-1 overflow-y-auto p-6 flex flex-col gap-4 fade-up mb-4"

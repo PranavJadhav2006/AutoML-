@@ -15,19 +15,21 @@ export default function Navbar() {
          style={{ background: "rgba(15,15,26,0.85)", backdropFilter: "blur(20px)" }}>
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-               style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
-            🤖
-          </div>
-          <span className="font-bold text-lg tracking-tight">
-            <span className="gradient-text">AutoML</span>
-            <span className="text-slate-300"> Studio</span>
-          </span>
-        </Link>
+        {/* Logo - Fixed width to balance with the spacer */}
+        <div className="w-48 flex justify-start">
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                 style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}>
+              🤖
+            </div>
+            <span className="font-bold text-lg tracking-tight">
+              <span className="gradient-text">AutoML</span>
+              <span className="text-slate-300"> Studio</span>
+            </span>
+          </Link>
+        </div>
 
-        {/* Nav links */}
+        {/* Nav links - Centered */}
         <div className="hidden md:flex items-center gap-1">
           {links.map(({ to, label, icon }) => {
             const active = pathname === to;
@@ -48,12 +50,8 @@ export default function Navbar() {
           })}
         </div>
 
-        {/* Status pill */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-             style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
-          <span className="w-2 h-2 rounded-full bg-accent-400 animate-pulse inline-block" />
-          <span className="text-accent-400">ML Engine Ready</span>
-        </div>
+        {/* Spacer - Balance the logo width for true centering */}
+        <div className="hidden md:block w-48"></div>
       </div>
     </nav>
   );
