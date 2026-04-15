@@ -2,9 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
-<<<<<<< HEAD
 const ML_URL = "http://localhost:8000";
-=======
+
 const SUGGESTED_QUESTIONS = [
   "Remove missing values",
   "Label encode categorical data",
@@ -14,7 +13,6 @@ const SUGGESTED_QUESTIONS = [
   "What is the class distribution?",
   "Describe the dataset statistics",
 ];
->>>>>>> origin/main
 
 function DataTable({ data }) {
   if (!data || typeof data !== "object") return null;
@@ -83,12 +81,7 @@ function ChatMessage({ msg }) {
           {isAction ? "⚡" : isError ? "⚠️" : "🤖"}
         </div>
       )}
-<<<<<<< HEAD
-      <div className={isUser ? "chat-bubble-user" : "chat-bubble-ai max-w-2xl"}>
-=======
       <div className={isUser ? "chat-bubble-user" : "chat-bubble-ai max-w-2xl overflow-x-hidden"}>
-        {/* Markdown-ish: bold */}
->>>>>>> origin/main
         <p className="whitespace-pre-wrap leading-relaxed"
            dangerouslySetInnerHTML={{
              __html: msg.content
@@ -154,24 +147,16 @@ function ChatMessage({ msg }) {
 
 export default function Chat() {
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const [sessionData, setSessionData] = useState(null);   // holds trainResult
-  const [handoff, setHandoff]         = useState(null);   // holds chatHandoff
-  const [messages, setMessages]       = useState([]);
-  const [suggestedQueries, setSuggestedQueries] = useState([]);
-  const [input, setInput]             = useState("");
-  const [loading, setLoading]         = useState(false);
-=======
-  const [result, setResult] = useState(null);
+  const [sessionData, setSessionData] = useState(null);
+  const [handoff, setHandoff] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [suggestedQueries, setSuggestedQueries] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [retraining, setRetraining] = useState(false);
->>>>>>> origin/main
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    // --- Read both storage keys ---
     const rawHandoff = sessionStorage.getItem("chatHandoff");
     const rawResult  = sessionStorage.getItem("trainResult");
 
@@ -186,10 +171,9 @@ export default function Chat() {
     if (rawHandoff) parsedHandoff = JSON.parse(rawHandoff);
     if (rawResult)  parsedResult  = JSON.parse(rawResult);
 
-    // Prefer handoff data from the new intelligent pipeline
     if (parsedHandoff) {
       setHandoff(parsedHandoff);
-      setSuggestedQueries(parsedHandoff.suggested_queries || []);
+      setSuggestedQueries(parsedHandoff.suggested_queries || SUGGESTED_QUESTIONS);
       setMessages([{
         role: "ai",
         content: parsedHandoff.first_message || `Your dataset is loaded and ready. Ask me anything about the data!`,
@@ -197,11 +181,10 @@ export default function Chat() {
       }]);
     }
 
-    // Always set session data for context (model_id etc.)
     if (parsedResult) {
       setSessionData(parsedResult);
-      // If no handoff, fall back to legacy welcome
       if (!parsedHandoff) {
+        setSuggestedQueries(SUGGESTED_QUESTIONS);
         setMessages([{
           role: "ai",
           content: `👋 Hi! I'm your dataset assistant for **${parsedResult.dataset_name}**.\n\nYou can ask me questions about the data — distributions, statistics, missing values, correlations, and more.\n\nTry one of the suggested questions below!`,
@@ -223,8 +206,6 @@ export default function Chat() {
     setLoading(true);
 
     try {
-<<<<<<< HEAD
-      // New pipeline: use /api/chat-dataset with dataset_path
       if (handoff?.dataset_path) {
         const res = await axios.post(`${ML_URL}/api/dataset/chat`, {
           dataset_path: handoff.dataset_path,
@@ -233,42 +214,38 @@ export default function Chat() {
         });
         setMessages((prev) => [
           ...prev,
-          { role: "ai", content: res.data.answer || res.data.response || JSON.stringify(res.data), data: res.data.data || null }
+          { 
+            role: "ai", 
+            content: res.data.answer || res.data.response || "Action completed.", 
+            data: res.data.data || null,
+            type: res.data.type,
+            changes: res.data.changes,
+            preview: res.data.preview
+          }
         ]);
       } else if (sessionData?.model_id) {
-        // Legacy fallback
         const res = await axios.post("/api/chat", {
           model_id: sessionData.model_id,
           question: q,
         });
         setMessages((prev) => [
           ...prev,
-          { role: "ai", content: res.data.answer, data: res.data.data }
+          { 
+            role: "ai", 
+            content: res.data.answer || "Action completed.", 
+            data: res.data.data,
+            type: res.data.type,
+            changes: res.data.changes,
+            preview: res.data.preview
+          }
         ]);
       } else {
         throw new Error("No active session found.");
       }
-=======
-      const res = await axios.post("/api/chat", {
-        model_id: result.model_id,
-        question: q,
-      });
-      setMessages((prev) => [
-        ...prev,
-        { 
-          role: "ai", 
-          content: res.data.answer || "Action completed.", 
-          data: res.data.data,
-          type: res.data.type,
-          changes: res.data.changes,
-          preview: res.data.preview
-        },
-      ]);
->>>>>>> origin/main
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: `⚠️ ${err.response?.data?.detail || err.message || "Failed to get a response. Is the ML service running?"}`, data: null }
+        { role: "ai", content: `⚠️ ${err.response?.data?.detail || err.message || "Failed to get a response. Is the ML service running?"}`, data: null, type: "error" }
       ]);
     } finally {
       setLoading(false);
@@ -282,26 +259,17 @@ export default function Chat() {
     }
   };
 
-<<<<<<< HEAD
-  // Display name
-  const datasetName = handoff?.profile_summary
-    ? (sessionData?.dataset_name || "Your Dataset")
-    : sessionData?.dataset_name || "Dataset";
-
-  const profileSummary = handoff?.profile_summary;
-
-  if (!sessionData && !handoff) return null;
-=======
   const handleRetrain = async () => {
     if (retraining) return;
+    const modelId = sessionData?.model_id || handoff?.chat_session_id;
+    if (!modelId) return;
+
     setRetraining(true);
     try {
       const res = await axios.post("/api/retrain", {
-        model_id: result.model_id,
+        model_id: modelId,
       });
-      // Update session storage with the newly generated training artifact payload
       sessionStorage.setItem("trainResult", JSON.stringify(res.data));
-      // Bounce immediately back to the Training UI where it will parse the new results
       navigate("/training");
     } catch (err) {
       setMessages((prev) => [
@@ -312,8 +280,13 @@ export default function Chat() {
     }
   };
 
-  if (!result) return null;
->>>>>>> origin/main
+  if (!sessionData && !handoff) return null;
+
+  const datasetName = handoff?.profile_summary
+    ? (sessionData?.dataset_name || "Your Dataset")
+    : sessionData?.dataset_name || "Dataset";
+
+  const profileSummary = handoff?.profile_summary;
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-12 flex flex-col h-[calc(100vh-64px)]">
@@ -338,11 +311,6 @@ export default function Chat() {
               )}
             </p>
           </div>
-<<<<<<< HEAD
-          <Link to="/training" className="btn-secondary text-sm py-2">
-            ← New Dataset
-          </Link>
-=======
           <div className="flex gap-3">
             <button 
               onClick={handleRetrain} 
@@ -362,8 +330,10 @@ export default function Chat() {
             <Link to="/playground" className="btn-secondary text-sm py-2">
               🎮 Playground
             </Link>
+            <Link to="/training" className="btn-secondary text-sm py-2">
+              ← New Dataset
+            </Link>
           </div>
->>>>>>> origin/main
         </div>
       </div>
 

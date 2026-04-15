@@ -258,16 +258,15 @@ def smart_preprocess(
         work_df, n_filled = _handle_missing(work_df)
         missing_handled = True
 
-    # ── STEP 4: Categorical encoding (conditional) ─────────────
-    n_encoded = 0
-    if analysis["cat_cols"] > 0:
-        work_df, n_encoded = _encode_categoricals(work_df)
-        # After get_dummies the target col name is preserved (it's numeric/label)
-
-    # ── STEP 5: Separate X / y ────────────────────────────────
-    # target_col must still be in work_df (get_dummies preserves numeric cols)
+    # ── STEP 4: Separate X / y ────────────────────────────────
     y_series = work_df[target_col].copy()
     X_df = work_df.drop(columns=[target_col])
+
+    # ── STEP 5: Categorical encoding (only on features) ────────
+    n_encoded = 0
+    if len(X_df.select_dtypes(include=["object", "category"]).columns) > 0:
+        X_df, n_encoded = _encode_categoricals(X_df)
+
     final_feature_names = list(X_df.columns)
 
     # Encode target if categorical

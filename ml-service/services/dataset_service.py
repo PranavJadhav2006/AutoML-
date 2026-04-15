@@ -17,6 +17,35 @@ class DatasetService:
         self.stopwords = {"i", "want", "to", "train", "a", "an", "model", "that", "can", "detect", "predict", "classify", "for", "the", "and", "or", "images", "dataset", "data", "using", "on", "with"}
 
     def _extract_keywords(self, query: str) -> str:
+        # Check if we can use Groq to intelligently extract keywords
+        groq_key = os.getenv("GROQ_API_KEY")
+        if groq_key and len(query.split()) > 4:
+            try:
+                import httpx
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [
+                        {"role": "system", "content": "You are a dataset search query generator. Extract 2 to 3 core keywords (nouns/entities only) from the user's description to use in a search engine like Kaggle or HuggingFace. Output ONLY the raw keywords separated by spaces. No explanation, no quotes."},
+                        {"role": "user", "content": query}
+                    ],
+                    "temperature": 0.1
+                }
+                resp = httpx.post(url, json=payload, headers=headers, timeout=5.0)
+                if resp.status_code == 200:
+                    keywords = resp.json()["choices"][0]["message"]["content"].strip()
+                    # Strip any punctuation Groq might have added
+                    clean_kw = re.sub(r'[^\w\s]', '', keywords).lower()
+                    if clean_kw:
+                        logger.info(f"LLM extracted keywords: '{clean_kw}' from '{query}'")
+                        return clean_kw
+            except Exception as e:
+                logger.warning(f"Groq keyword extraction failed ({e}), falling back to regex.")
+
         # Remove punctuation
         clean_query = re.sub(r'[^\w\s]', '', query).lower()
         words = clean_query.split()
